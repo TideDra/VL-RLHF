@@ -1,0 +1,26 @@
+accelerate launch --config_file accelerate_config/config.yaml \
+        llava_dpo.py \
+        --model_name_or_path /mnt/gozhang/ckpts/llava-1.5-7b-hf \
+        --output_dir /mnt/gozhang/ckpts/llava-1.5-7b-dpo \
+        --data_dir /mnt/gozhang/data_dir/VLFeedback \
+        --per_device_train_batch_size 4 \
+        --gradient_accumulation_steps 4 \
+        --max_length 1024 \
+        --max_prompt_length 512 \
+        --num_train_epochs 3 \
+        --remove_unused_columns False \
+        --learning_rate 1e-5 \
+        --weight_decay 0.05 \
+        --warmup_ratio 0.1 \
+        --lr_scheduler_type "cosine" \
+        --gradient_checkpointing True \
+        --bf16 True \
+        --evaluation_strategy "steps" \
+        --eval_steps 100 \
+        --save_strategy "steps" \
+        --save_steps 500 \
+        --save_total_limit 1 \
+        --logging_steps 10 \
+        --report_to wandb \
+        --run_name "llava-1.5-7b-dpo" \
+        --wandb_project "VL-RLHF"
