@@ -1,0 +1,138 @@
+from PIL import Image
+from transformers import AutoProcessor, LlavaForConditionalGeneration,AutoTokenizer
+from torch.utils.data import Dataset,DataLoader
+import torch
+from tqdm import tqdm
+import argparse
+import base64
+import pandas as pd
+import io
+from collections import defaultdict
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_root", type=str, default=None)
+    parser.add_argument("--model_path", type=str, default="/mnt/gozhang/ckpts/llava-1.5-7b-hf")
+    parser.add_argument("--output_path", type=str, default="mmbench_result.xlsx")
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--max_new_tokens", type=int, default=1024)
+
+    return parser.parse_args()
+
+
+
+class MMBenchDataset(Dataset):
+    def __init__(self,
+                 data_file,
+                 sys_prompt='There are several options:'):
+        self.df = pd.read_csv(data_file, sep='\t')
+        self.sys_prompt = sys_prompt
+
+    @staticmethod
+    def decode_base64_to_image(base64_string):
+        image_data = base64.b64decode(base64_string)
+        image = Image.open(io.BytesIO(image_data))
+        return image
+    
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        index = self.df.iloc[idx]['index']
+        image = self.df.iloc[idx]['image']
+        image = self.decode_base64_to_image(image)
+        question = self.df.iloc[idx]['question']
+        answer = self.df.iloc[idx]['answer'] if 'answer' in self.df.iloc[0].keys() else None
+        catetory = self.df.iloc[idx]['category']
+        l2_catetory = self.df.iloc[idx]['l2-category']
+        option_candidate = ['A', 'B', 'C', 'D', 'E']
+        options = {
+            cand: self.load_from_df(idx, cand)
+            for cand in option_candidate
+            if self.load_from_df(idx, cand) is not None
+        }
+        options_prompt = f'{self.sys_prompt}\n'
+        for key, item in options.items():
+            options_prompt += f'{key}. {item}\n'
+        hint = self.load_from_df(idx, 'hint')
+        data = {
+            'img': image,
+            'question': question,
+            'answer': answer,
+            'options': options_prompt,
+            'category': catetory,
+            'l2-category': l2_catetory,
+            'options_dict': options,
+            'index': index,
+            'context': hint,
+        }
+        if data['context'] is not None:
+            prompt = data['context'] + ' ' + data['question'] + ' ' + data['options']+ '\n' + 'please only output the option letter.'
+        else:
+            prompt = data['question'] + ' ' + data['options']+ '\n' + 'please only output the option letter.'
+        prompt = "USER: <image>\n" + prompt + " ASSISTANT:"
+        data['prompt'] = prompt
+        return data
+    def load_from_df(self, idx, key):
+        if key in self.df.iloc[idx] and not pd.isna(self.df.iloc[idx][key]):
+            return self.df.iloc[idx][key]
+        else:
+            return None
+
+def collator(batch):
+    concat_batch = defaultdict(list)
+    for data in batch:
+        for key, item in data.items():
+            concat_batch[key].append(item)
+    concat_batch['input'] = processor(text=concat_batch['prompt'],images=concat_batch['img'],return_tensors="pt",padding=True)
+    return concat_batch
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    data_root = args.data_root
+    processor = AutoProcessor.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    processor.tokenizer.pad_token = processor.tokenizer.bos_token
+    model = LlavaForConditionalGeneration.from_pretrained(args.model_path,torch_dtype=torch.float16)
+    model.to('cuda')
+    dataset = MMBenchDataset(data_root)
+    dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
+    results = defaultdict(list)
+    bar = tqdm(total=len(dataset))
+    model.eval()
+    with torch.inference_mode():
+        for batch in dataloader:
+            inputs = batch['input']
+            inputs.to('cuda')
+            inputs['pixel_values'] = inputs['pixel_values'].half()
+            outputs = model.generate(**inputs,do_sample=True,max_new_tokens=args.max_new_tokens,use_cache=True,temperature=args.temperature)
+            input_token_len = inputs['input_ids'].shape[1]
+            responses=tokenizer.batch_decode(outputs[:, input_token_len:], skip_special_tokens=True, clean_up_tokenization_spaces=False)
+            for k,v in batch.items():
+                if k in ['question','options_dict','category','l2-category','index']:
+                    results[k].extend(v)
+            results['response'].extend(responses)
+            bar.update(len(responses))
+    
+    answer_upload = defaultdict(list)
+
+    for question,options_dict,category,l2_category,index,response in zip(results['question'],results['options_dict'],results['category'],results['l2-category'],results['index'],results['response']):
+        choice_A = getattr(options_dict,'A','')
+        choice_B = getattr(options_dict,'B','')
+        choice_C = getattr(options_dict,'C','')
+        choice_D = getattr(options_dict,'D','')
+        split = 'dev'
+        answer_upload['question'].append(question)
+        answer_upload['A'].append(choice_A)
+        answer_upload['B'].append(choice_B)
+        answer_upload['C'].append(choice_C)
+        answer_upload['D'].append(choice_D)
+        answer_upload['prediction'].append(response)
+        answer_upload['category'].append(category)
+        answer_upload['l2_category'].append(l2_category)
+        answer_upload['index'].append(index)
+        answer_upload['split'].append(split)
+
+    answer_upload = pd.DataFrame(answer_upload)
+    answer_upload.to_excel(args.output_path,index=False)
