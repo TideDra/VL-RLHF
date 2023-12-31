@@ -1,3 +1,4 @@
+export PYTHONPATH=$PYTHONPATH:$PWD
 python eval/mmhal/eval.py \
     --data_root ./data_dir/MMHal-Bench \
     --model_path $CKPT \

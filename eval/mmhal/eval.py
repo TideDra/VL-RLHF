@@ -1,13 +1,13 @@
 import json
 from PIL import Image
-from transformers import AutoProcessor, LlavaForConditionalGeneration, AutoTokenizer
+from utils.auto_load import MyAutoModel, MyAutoProcessor, MyAutoGenerationConfig
 from torch.utils.data import Dataset, DataLoader
 import torch
 import os
 from tqdm import tqdm
 import argparse
 from collections import defaultdict
-
+import copy
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -40,10 +40,9 @@ class MMHalDataset(Dataset):
         data = self.data[index]
         imagename = data["image_src"].split("/")[-1]
         imagename = os.path.join(self.data_root, "images", imagename)
-        image = Image.open(imagename).convert("RGB")
-        data["image"] = image
-        data["prompt"] = "USER: <image>\n" + data["question"] + " ASSISTANT:"
-        return self.data[index]
+        data["image"] = imagename
+        data["prompt"] = copy.deepcopy(data["question"])
+        return data
 
 
 def collator(batch):
@@ -51,27 +50,26 @@ def collator(batch):
     for data in batch:
         for key, item in data.items():
             concat_batch[key].append(item)
-    concat_batch["input"] = processor(
-        text=concat_batch["prompt"],
-        images=concat_batch["image"],
-        return_tensors="pt",
-        padding=True,
-    )
+    imgs_path = concat_batch["image"]
+    concat_batch['prompt'] = [processor.format_multimodal_prompt(prompt,img) for prompt,img in zip(concat_batch['prompt'],imgs_path)]
+    inputs = processor(texts=concat_batch['prompt'],images_path=imgs_path,padding_side='left')
+    concat_batch['input'] = inputs
     return concat_batch
 
 
 if __name__ == "__main__":
     args = parse_args()
     data_root = args.data_root
-    processor = AutoProcessor.from_pretrained(args.model_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    processor.tokenizer.pad_token = processor.tokenizer.bos_token
-    model = LlavaForConditionalGeneration.from_pretrained(
+    processor = MyAutoProcessor.from_pretrained(args.model_path)
+    processor.infer()
+    tokenizer = processor.tokenizer
+    model = MyAutoModel.from_pretrained(
         args.model_path, torch_dtype=torch.float16
     )
     model.to("cuda")
     dataset = MMHalDataset(data_root)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, collate_fn=collator)
+    generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
     results = []
     bar = tqdm(total=len(dataset))
     model.eval()
@@ -79,12 +77,9 @@ if __name__ == "__main__":
         for batch in dataloader:
             inputs = batch["input"]
             inputs.to("cuda")
-            inputs["pixel_values"] = inputs["pixel_values"].half()
             outputs = model.generate(
                 **inputs,
-                temperature=args.temperature,
-                do_sample=True,
-                max_new_tokens=args.max_new_tokens,
+                generation_config=generation_config,
                 use_cache=True
             )
             input_token_len = inputs["input_ids"].shape[1]

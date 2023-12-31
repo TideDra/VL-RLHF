@@ -6,8 +6,8 @@ from transformers import HfArgumentParser, Trainer
 from peft import LoraConfig
 import transformers
 import os
-from auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAutoProcessor
-from utils.common import get_vision_tower, prepare_tokenizer
+from utils.auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAutoProcessor
+from utils.common import get_vision_tower, prepare_tokenizer, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
 
@@ -82,6 +82,7 @@ class LoraArguments:
         if self.modules_to_save is not None:
             self.modules_to_save = self.modules_to_save.split(",")
 
+@dataclass
 class TrainingArguments(transformers.TrainingArguments):
     use_lora: bool = False
     project_name: Optional[str] = field(
@@ -90,24 +91,6 @@ class TrainingArguments(transformers.TrainingArguments):
     group_name: Optional[str] = field(
         default="llava-1.5-7b-dpo", metadata={"help": "wandb group name"}
     )
-
-
-def safe_save_model_for_hf_trainer(trainer: Trainer, output_dir: str):
-    """Collects the state dict and dump to disk."""
-    #! need to be tested
-    if trainer.deepspeed:
-        torch.cuda.synchronize()
-
-    if trainer.args.use_lora:
-        model = trainer.model.merge_and_unload()
-        state_dict = model.state_dict()
-    else:
-        state_dict = trainer.model.state_dict()
-    if trainer.args.should_save and trainer.args.local_rank == 0:
-        cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
-        del state_dict
-        trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
-
 
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, TrainingArguments, LoraArguments))
@@ -140,7 +123,6 @@ if __name__ == "__main__":
         script_args.model_name_or_path,
         config=config,
         device_map=device_map,
-        trust_remote_code=True,
         quantization_config=GPTQConfig(bits=lora_args.bits, disable_exllama=True)
         if training_args.use_lora and lora_args.q_lora
         else None,
@@ -179,7 +161,7 @@ if __name__ == "__main__":
     prepare_tokenizer(processor.tokenizer, "train")
 
     local_rank = training_args.local_rank
-    dataset = make_vlfeedback_paired_dataset(local_rank, script_args.data_dir)
+    dataset = make_vlfeedback_paired_dataset(local_rank, script_args.data_dir, script_args.score_margin)
     dataset_split = dataset.train_test_split(test_size=0.005, seed=42)
     train_dataset = dataset_split["train"]
     eval_dataset = dataset_split["test"]
@@ -205,7 +187,7 @@ if __name__ == "__main__":
         generate_during_eval=True,
         label_pad_token_id=script_args.label_pad_token_id,
         data_collator=data_collator,
-        lora_config=lora_config
+        peft_config=lora_config
     )
     dpo_trainer.use_dpo_data_collator = True
 

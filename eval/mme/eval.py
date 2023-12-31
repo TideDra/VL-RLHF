@@ -1,6 +1,6 @@
 import json
 from PIL import Image
-from transformers import AutoProcessor, LlavaForConditionalGeneration,AutoTokenizer
+from utils.auto_load import MyAutoProcessor, MyAutoProcessor, MyAutoModel, MyAutoGenerationConfig
 from torch.utils.data import Dataset,DataLoader
 import torch
 import os
@@ -13,8 +13,7 @@ def parse_args():
     parser.add_argument("--model_path", type=str, default="/mnt/gozhang/ckpts/llava-1.5-7b-hf")
     parser.add_argument("--output_path", type=str, default="mme_result.json")
     parser.add_argument("--batch_size", type=int, default=16)
-    #parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--max_new_tokens", type=int, default=1024)
+
 
     return parser.parse_args()
 
@@ -23,7 +22,7 @@ class MMEDataset(Dataset):
     def __init__(self,data_root) -> None:
         super().__init__()
         self.data_root = data_root
-        with jsonlines.open(os.path.join(data_root, "llava_mme.jsonl"), "r") as f:
+        with jsonlines.open(os.path.join(data_root, "mme.jsonl"), "r") as f:
             self.data = [item for item in f]
     def __len__(self):
         return len(self.data)
@@ -32,14 +31,15 @@ class MMEDataset(Dataset):
         return {'question_id':self.data[index]["question_id"],
                 'image':os.path.join(self.data_root,self.data[index]['image']),
                 "text":self.data[index]['text'],
-                'prompt':"USER: <image>\n"+self.data[index]['text']+" ASSISTANT:"}
+                'prompt':self.data[index]['text']}
 
 def collator(batch):
     question_ids = [b['question_id'] for b in batch]
     prompts = [b['prompt'] for b in batch]
     texts = [b['text'] for b in batch]
-    images = [Image.open(b['image']) for b in batch]
-    inputs = processor(text=prompts,images=images,return_tensors="pt",padding=True)
+    img_path = [b['image'] for b in batch]
+    prompts = [processor.format_multimodal_prompt(prompt,img) for prompt,img in zip(prompts,img_path)]
+    inputs = processor(texts=prompts,images_path=img_path,padding_side='left')
     return question_ids,texts,inputs
 
 
@@ -47,21 +47,21 @@ def collator(batch):
 if __name__ == "__main__":
     args = parse_args()
     data_root = args.data_root
-    processor = AutoProcessor.from_pretrained(args.model_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    processor.tokenizer.pad_token = processor.tokenizer.bos_token
-    model = LlavaForConditionalGeneration.from_pretrained(args.model_path,torch_dtype=torch.float16)
+    processor = MyAutoProcessor.from_pretrained(args.model_path)
+    processor.infer()
+    tokenizer = processor.tokenizer
+    model = MyAutoModel.from_pretrained(args.model_path,torch_dtype=torch.float16)
     model.to('cuda')
     dataset = MMEDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
+    generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
     results = []
     bar = tqdm(total=len(dataset))
     model.eval()
     with torch.inference_mode():
         for question_ids,texts,inputs in dataloader:
             inputs.to('cuda')
-            inputs['pixel_values'] = inputs['pixel_values'].half()
-            outputs = model.generate(**inputs,do_sample=False,max_new_tokens=args.max_new_tokens,use_cache=True)
+            outputs = model.generate(**inputs,generation_config=generation_config,use_cache=True)
             input_token_len = inputs['input_ids'].shape[1]
             responses=tokenizer.batch_decode(outputs[:, input_token_len:], skip_special_tokens=True, clean_up_tokenization_spaces=False)
             for question_id,text,res in zip(question_ids,texts,responses):

@@ -1,5 +1,5 @@
 from PIL import Image
-from transformers import AutoProcessor, LlavaForConditionalGeneration,AutoTokenizer
+from utils.auto_load import MyAutoModel, MyAutoProcessor, MyAutoGenerationConfig
 from torch.utils.data import Dataset,DataLoader
 import torch
 from tqdm import tqdm
@@ -8,14 +8,16 @@ import base64
 import pandas as pd
 import io
 from collections import defaultdict
+import tempfile
+from time import time
+import os
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, default=None)
     parser.add_argument("--model_path", type=str, default="/mnt/gozhang/ckpts/llava-1.5-7b-hf")
     parser.add_argument("--output_path", type=str, default="mmbench_result.xlsx")
     parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--max_new_tokens", type=int, default=1024)
 
     return parser.parse_args()
 
@@ -27,12 +29,14 @@ class MMBenchDataset(Dataset):
                  sys_prompt='There are several options:'):
         self.df = pd.read_csv(data_file, sep='\t')
         self.sys_prompt = sys_prompt
+        self.temp_img_dir = tempfile.TemporaryDirectory()
 
-    @staticmethod
-    def decode_base64_to_image(base64_string):
+    def dump_image_to_tempfile(self,base64_string):
         image_data = base64.b64decode(base64_string)
         image = Image.open(io.BytesIO(image_data))
-        return image
+        name = os.path.join(self.temp_img_dir.name, f'{time()}.jpg')
+        image.save(name)
+        return name
     
     def __len__(self):
         return len(self.df)
@@ -40,7 +44,7 @@ class MMBenchDataset(Dataset):
     def __getitem__(self, idx):
         index = self.df.iloc[idx]['index']
         image = self.df.iloc[idx]['image']
-        image = self.decode_base64_to_image(image)
+        image = self.dump_image_to_tempfile(image)
         question = self.df.iloc[idx]['question']
         answer = self.df.iloc[idx]['answer'] if 'answer' in self.df.iloc[0].keys() else None
         catetory = self.df.iloc[idx]['category']
@@ -70,7 +74,7 @@ class MMBenchDataset(Dataset):
             prompt = data['context'] + ' ' + data['question'] + ' ' + data['options']+ '\n' + 'please only output the option letter.'
         else:
             prompt = data['question'] + ' ' + data['options']+ '\n' + 'please only output the option letter.'
-        prompt = "USER: <image>\n" + prompt + " ASSISTANT:"
+
         data['prompt'] = prompt
         return data
     def load_from_df(self, idx, key):
@@ -84,17 +88,19 @@ def collator(batch):
     for data in batch:
         for key, item in data.items():
             concat_batch[key].append(item)
-    concat_batch['input'] = processor(text=concat_batch['prompt'],images=concat_batch['img'],return_tensors="pt",padding=True)
+    concat_batch['prompt'] = [processor.format_multimodal_prompt(promt,img_path) for promt,img_path in zip(concat_batch['prompt'],concat_batch['img'])]
+    concat_batch['input'] = processor(texts=concat_batch['prompt'],images_path=concat_batch['img'],padding_side='left')
     return concat_batch
 
 
 if __name__ == "__main__":
     args = parse_args()
     data_root = args.data_root
-    processor = AutoProcessor.from_pretrained(args.model_path)
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    processor.tokenizer.pad_token = processor.tokenizer.bos_token
-    model = LlavaForConditionalGeneration.from_pretrained(args.model_path,torch_dtype=torch.float16)
+    processor = MyAutoProcessor.from_pretrained(args.model_path)
+    generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
+    tokenizer = processor.tokenizer
+    processor.infer()
+    model = MyAutoModel.from_pretrained(args.model_path,torch_dtype=torch.bfloat16)
     model.to('cuda')
     dataset = MMBenchDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
@@ -105,8 +111,7 @@ if __name__ == "__main__":
         for batch in dataloader:
             inputs = batch['input']
             inputs.to('cuda')
-            inputs['pixel_values'] = inputs['pixel_values'].half()
-            outputs = model.generate(**inputs,do_sample=True,max_new_tokens=args.max_new_tokens,use_cache=True,temperature=args.temperature)
+            outputs = model.generate(**inputs,use_cache=True,generation_config=generation_config)
             input_token_len = inputs['input_ids'].shape[1]
             responses=tokenizer.batch_decode(outputs[:, input_token_len:], skip_special_tokens=True, clean_up_tokenization_spaces=False)
             for k,v in batch.items():
@@ -114,14 +119,14 @@ if __name__ == "__main__":
                     results[k].extend(v)
             results['response'].extend(responses)
             bar.update(len(responses))
-    
+    dataset.temp_img_dir.cleanup()
     answer_upload = defaultdict(list)
 
     for question,options_dict,category,l2_category,index,response in zip(results['question'],results['options_dict'],results['category'],results['l2-category'],results['index'],results['response']):
-        choice_A = getattr(options_dict,'A','')
-        choice_B = getattr(options_dict,'B','')
-        choice_C = getattr(options_dict,'C','')
-        choice_D = getattr(options_dict,'D','')
+        choice_A = options_dict.get('A',"")
+        choice_B = options_dict.get('B',"")
+        choice_C = options_dict.get('C',"")
+        choice_D = options_dict.get('D',"")
         split = 'dev'
         answer_upload['question'].append(question)
         answer_upload['A'].append(choice_A)

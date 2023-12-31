@@ -14,24 +14,10 @@ from trl import DPOTrainer
 import torch
 from .processor import VLProcessor
 from abc import ABC
-
-def pad_to_length(
-    tensor: torch.Tensor, length: int, pad_value: Union[int, float], dim: int = -1
-) -> torch.Tensor:
-    if tensor.size(dim) >= length:
-        return tensor
-    else:
-        pad_size = list(tensor.shape)
-        pad_size[dim] = length - tensor.size(dim)
-        return torch.cat(
-            [
-                tensor,
-                pad_value
-                * torch.ones(*pad_size, dtype=tensor.dtype, device=tensor.device),
-            ],
-            dim=dim,
-        )
-
+from utils.common import pad_to_length
+from peft import PeftModel
+from transformers.trainer import unwrap_model
+import os
 
 class VLDPOTrainer(DPOTrainer, ABC):
     def __init__(
@@ -51,7 +37,7 @@ class VLDPOTrainer(DPOTrainer, ABC):
         processor: VLProcessor | None = None, #* replace tokenizer with processor. processor is a class that contains tokenizer and image processor
         model_init: Callable[[], PreTrainedModel] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = ...,
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
         max_length: int | None = None,
         max_prompt_length: int | None = None,
@@ -99,7 +85,7 @@ class VLDPOTrainer(DPOTrainer, ABC):
     
     def tokenize_row(self, feature, model: PreTrainedModel | Module = None) -> Dict:
         #* tokenize_row manages all processing steps for tokenizing all texts to input_ids, labels, attention_mask, etc.
-        prompt = self.processor.format_prompt(feature['prompt'],feature['img_path']) # add image placeholder to prompt
+        prompt = self.processor.format_multimodal_prompt(feature['prompt'],feature['img_path']) # add image placeholder to prompt
         prompt = self.processor.make_single_turn_conv(prompt,"") # This returns [{"user":<image>\n<prompt>,"assistant":""}]
         prompt = self.processor.process_batch_conv(prompt,system_message=None) # This returns {"prompt":None,"answer":None,"full":None,"raw_str":[...]}
         feature['prompt'] = prompt['raw_str'][0] # This returns "USER: <image>\n<prompt> ASSISTANT:"
@@ -107,6 +93,40 @@ class VLDPOTrainer(DPOTrainer, ABC):
         batch['img_path'] = feature['img_path']
         return batch
 
+    def _save(self, output_dir: Optional[str] = None, state_dict=None):
+        #* merge peft model before saving
+        # If we are executing this function, we are the process zero, so we don't check for that.
+        output_dir = output_dir if output_dir is not None else self.args.output_dir
+        os.makedirs(output_dir, exist_ok=True)
+        supported_classes = (PreTrainedModel, PeftModel)
+        # Save a trained model and configuration using `save_pretrained()`.
+        # They can then be reloaded using `from_pretrained()`
+        model = self.model
+        if not isinstance(model, supported_classes): # model is wrapped
+            model = unwrap_model(model)
+            if isinstance(model, PeftModel):
+                model = model.merge_and_unload()
+            if state_dict is None:
+                state_dict = model.state_dict()
+            cpu_state_dict = {k: v.cpu() for k, v in state_dict.items()}
+            model.save_pretrained(
+                    output_dir, state_dict=cpu_state_dict, safe_serialization=self.args.save_safetensors
+                )
+
+        else: # model is not wrapped
+            if isinstance(model, PeftModel):
+                model = model.merge_and_unload()
+            if state_dict is None:
+                state_dict = model.state_dict()
+            model.save_pretrained(
+                output_dir, state_dict=state_dict, safe_serialization=self.args.save_safetensors
+            )
+
+        if self.tokenizer is not None:
+            self.tokenizer.save_pretrained(output_dir)
+
+        # Good practice: save your training arguments together with the trained model
+        torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
 
 class LLaVADPOTrainer(VLDPOTrainer):
     def concatenated_inputs(
@@ -242,7 +262,7 @@ class QwenVLDPOTrainer(VLDPOTrainer):
         prompt = feature["prompt"]
         chosen = feature["chosen"]
         rejected = feature["rejected"]
-        prompt = self.processor.format_prompt(prompt, feature["img_path"])
+        prompt = self.processor.format_multimodal_prompt(prompt, feature["img_path"])
         # format for preprocessing
 
         chosen_conv = self.processor.make_single_turn_conv(prompt, chosen)
@@ -338,7 +358,7 @@ class QwenVLDPOTrainer(VLDPOTrainer):
         rejected_tokens["labels"][: len(prompt_tokens["input_ids"])] = [
             self.label_pad_token_id
         ] * len(prompt_tokens["input_ids"])
-
+        prompt_tokens = {f"prompt_{k}": v for k, v in prompt_tokens.items()}
         for k, toks in {
             "chosen_": chosen_tokens,
             "rejected_": rejected_tokens,
@@ -348,5 +368,4 @@ class QwenVLDPOTrainer(VLDPOTrainer):
                 if type_key == "token_type_ids":
                     continue
                 batch[f"{k}{type_key}"] = tokens
-
         return batch

@@ -1,3 +1,4 @@
+export PYTHONPATH=$PYTHONPATH:$PWD
 DATA_DIR=./data_dir/MME
 
 python eval/mme/eval.py \
