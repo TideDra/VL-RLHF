@@ -91,6 +91,7 @@ class TrainingArguments(transformers.TrainingArguments):
     group_name: Optional[str] = field(
         default="llava-1.5-7b-dpo", metadata={"help": "wandb group name"}
     )
+    resume_from_checkpoint: Optional[bool] = field(default=None)
 
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, TrainingArguments, LoraArguments))
