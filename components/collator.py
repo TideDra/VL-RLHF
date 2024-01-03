@@ -66,7 +66,7 @@ class VLDPODataCollatorWithPadding(abc.ABC):
 
         return padded_batch
 
-class LLaVADPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
+class LlavaDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         # first, pad everything to the same length
         padded_batch = super().__call__(features)

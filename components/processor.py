@@ -29,6 +29,7 @@ class VLProcessor(ABC):
     @abstractmethod
     def save_pretrained(
         self,
+        output_dir: str
     ):  # hack for some model uses unique processor, and we need to save it after training.
         raise NotImplementedError
 
@@ -147,8 +148,8 @@ class LlavaProcessor(VLProcessor):
     def image_processor(self):
         return self.processor.image_processor
 
-    def save_pretrained(self):
-        return self.processor.save_pretrained()
+    def save_pretrained(self, output_dir):
+        return self.processor.save_pretrained(output_dir)
 
     def process_batch_conv(self, sources, system_message):
         roles = {"user": "USER: ", "assistant": "ASSISTANT: "}
@@ -218,7 +219,7 @@ class QwenVLProcessor(VLProcessor):
     def image_processor(self):
         return None
 
-    def save_pretrained(self):
+    def save_pretrained(self,output_dir):
         return None
 
     def process_batch_conv(

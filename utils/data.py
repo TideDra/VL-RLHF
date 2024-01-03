@@ -3,7 +3,7 @@ import torch
 from collections import defaultdict
 from itertools import combinations
 import numpy as np
-
+from components.processor import VLProcessor
 def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:float = -1):
     ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
 
@@ -81,6 +81,54 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
         make_batch_pairs,
         batched=True,
         remove_columns=set(ds.column_names) - set(["prompt", "chosen", "rejected","img_path"]),
+        keep_in_memory=True
+    )
+
+    if local_rank == 0:
+        print("Loading results from main process")
+        torch.distributed.barrier()
+
+    return ds
+
+def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
+    ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
+
+    # make comparison pairs from completion list
+    if local_rank > 0:
+        print("Waiting for main process to perform the mapping")
+        torch.distributed.barrier()
+
+    def get_best_response(sample):
+        converted_sample = defaultdict(list)
+
+        for sample_idx, comps in enumerate(sample["completions"]):
+            prompt = sample["prompt"][sample_idx]
+            img_path = sample['img_path'][sample_idx]
+            
+            best_score = -1
+            for idx,anno in enumerate(comps['annotations']):
+                # get average scores
+                try:
+                    avg_score = np.mean(
+                        [
+                            float(anno[aspect]["Rating"])
+                            for aspect in anno
+                        ]
+                    )
+                except ValueError:
+                    continue
+                if avg_score > best_score:
+                    best_score = avg_score
+                    best_response = comps["response"][idx]
+            converted_sample["conversations"] = VLProcessor.make_single_turn_conv(prompt,best_response)
+            converted_sample["image"] = img_path
+
+        return converted_sample
+
+    ds = ds.map(
+        get_best_response,
+        batched=True,
+        remove_columns=set(ds.column_names) - set(["conversations","image"]),
         keep_in_memory=True
     )
 
