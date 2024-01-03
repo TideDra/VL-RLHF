@@ -94,9 +94,9 @@ def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
     ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
 
     # make comparison pairs from completion list
-    if local_rank > 0:
-        print("Waiting for main process to perform the mapping")
-        torch.distributed.barrier()
+    #if local_rank > 0:
+    #    print("Waiting for main process to perform the mapping")
+    #    torch.distributed.barrier()
 
     def get_best_response(sample):
         converted_sample = defaultdict(list)
@@ -120,8 +120,8 @@ def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
                 if avg_score > best_score:
                     best_score = avg_score
                     best_response = comps["response"][idx]
-            converted_sample["conversations"] = VLProcessor.make_single_turn_conv(prompt,best_response)
-            converted_sample["image"] = img_path
+            converted_sample["conversations"].append(VLProcessor.make_single_turn_conv(prompt,best_response))
+            converted_sample["image"].append(img_path)
 
         return converted_sample
 
@@ -132,8 +132,8 @@ def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
         keep_in_memory=True
     )
 
-    if local_rank == 0:
-        print("Loading results from main process")
-        torch.distributed.barrier()
+    #if local_rank == 0:
+    #    print("Loading results from main process")
+    #    torch.distributed.barrier()
 
     return ds
