@@ -64,6 +64,7 @@ class ScriptArguments:
     )
 
     freeze_vision_tower: bool = field(default=True)
+    merge_peft_model: bool = field(default=True)
 
 @dataclass
 class LoraArguments:
@@ -196,3 +197,7 @@ if __name__ == "__main__":
     dpo_trainer.save_state()
     safe_save_model_for_hf_trainer(dpo_trainer, training_args.output_dir)
     processor.save_pretrained(training_args.output_dir)
+    if script_args.merge_peft_model and training_args.use_lora:
+        merged_model = model.merge_peft_model()
+        merged_dir = os.path.join(training_args.output_dir, "merged")
+        merged_model.save_pretrained(merged_dir)
