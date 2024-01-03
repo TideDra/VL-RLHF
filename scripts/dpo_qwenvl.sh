@@ -1,12 +1,13 @@
 per_device_train_batch_size=4
 gradient_accumulation_steps=8
-epoch=3
-margin=0
+epoch=1
+margin=-1
 beta=0.1
 lr=1e-5
 gpu_number=$(nvidia-smi --list-gpus | wc -l)
 global_bs=$((per_device_train_batch_size * gradient_accumulation_steps * gpu_number))
 name="bs_${global_bs}_ep_${epoch}_mg_${margin}_bt_${beta}_lr_${lr}"
+
 accelerate launch --config_file accelerate_config/config.yaml \
         dpo.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
