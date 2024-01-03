@@ -7,7 +7,7 @@ from peft import LoraConfig
 import transformers
 import os
 from utils.auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAutoProcessor
-from utils.common import get_vision_tower, prepare_tokenizer, safe_save_model_for_hf_trainer
+from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
 
@@ -160,7 +160,7 @@ if __name__ == "__main__":
 
     processor = MyAutoProcessor.from_pretrained(script_args.model_name_or_path)
 
-    prepare_tokenizer(processor.tokenizer, "train")
+    processor.train()
 
     local_rank = training_args.local_rank
     dataset = make_vlfeedback_paired_dataset(local_rank, script_args.data_dir, script_args.score_margin)
