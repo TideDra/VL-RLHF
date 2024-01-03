@@ -15,9 +15,6 @@ import torch
 from .processor import VLProcessor
 from abc import ABC
 from utils.common import pad_to_length
-from peft import PeftModel
-from transformers.trainer import unwrap_model
-import os
 
 class VLDPOTrainer(DPOTrainer, ABC):
     def __init__(
@@ -93,42 +90,7 @@ class VLDPOTrainer(DPOTrainer, ABC):
         batch['img_path'] = feature['img_path']
         return batch
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None):
-        #* merge peft model before saving
-        # If we are executing this function, we are the process zero, so we don't check for that.
-        output_dir = output_dir if output_dir is not None else self.args.output_dir
-        os.makedirs(output_dir, exist_ok=True)
-        supported_classes = (PreTrainedModel, PeftModel)
-        # Save a trained model and configuration using `save_pretrained()`.
-        # They can then be reloaded using `from_pretrained()`
-        model = self.model
-        if not isinstance(model, supported_classes): # model is wrapped
-            model = unwrap_model(model)
-            if isinstance(model, PeftModel):
-                model = model.merge_and_unload()
-            if state_dict is None:
-                state_dict = model.state_dict()
-            cpu_state_dict = {k: v.cpu() for k, v in state_dict.items()}
-            model.save_pretrained(
-                    output_dir, state_dict=cpu_state_dict, safe_serialization=self.args.save_safetensors
-                )
-
-        else: # model is not wrapped
-            if isinstance(model, PeftModel):
-                model = model.merge_and_unload()
-            if state_dict is None:
-                state_dict = model.state_dict()
-            model.save_pretrained(
-                output_dir, state_dict=state_dict, safe_serialization=self.args.save_safetensors
-            )
-
-        if self.tokenizer is not None:
-            self.tokenizer.save_pretrained(output_dir)
-
-        # Good practice: save your training arguments together with the trained model
-        torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
-
-class LLaVADPOTrainer(VLDPOTrainer):
+class LlavaDPOTrainer(VLDPOTrainer):
     def concatenated_inputs(
         self,
         batch: Dict[str, Union[List, torch.LongTensor]],
