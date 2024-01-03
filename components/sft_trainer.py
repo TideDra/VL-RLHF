@@ -17,12 +17,13 @@ from transformers.trainer_utils import EvalPrediction
 from transformers import Trainer
 from abc import ABC
 import torch
+from components.collator import VLSFTDataCollatorWithPadding
+from transformers.trainer_pt_utils import LabelSmoother
 class VLSFTTrainer(Trainer, ABC):
     def __init__(
         self,
         model: PreTrainedModel | Module = None,
         args: TrainingArguments = None,
-        data_collator: Any | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
@@ -35,13 +36,8 @@ class VLSFTTrainer(Trainer, ABC):
     ):
         self.processor = processor
         self.max_seq_length = max_seq_length
-        if args.local_rank > 0:
-            print("Waiting for main process to perform the mapping")
-            torch.distributed.barrier()
         train_dataset = self._prepare_dataset(train_dataset, max_seq_length)
-        if args.local_rank == 0:
-            print("Loading results from main process")
-            torch.distributed.barrier()
+        data_collator = VLSFTDataCollatorWithPadding(self.processor.tokenizer.pad_token_id,LabelSmoother.ignore_index)
         super().__init__(
             model,
             args,
@@ -78,9 +74,9 @@ class VLSFTTrainer(Trainer, ABC):
                 first_sentence, image
             )
             conv[0]["value"] = first_sentence
-            tokens = self.processor.process_batch_conv([conv])["full"][0]
+            tokens = self.processor.process_batch_conv([conv])["full"]
             tokens = {
-                k: torch.tensor(v[:max_seq_length], dtype=torch.int)
+                k: v[0][:max_seq_length]
                 for k, v in tokens.items()
             }
             return tokens

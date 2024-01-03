@@ -7,7 +7,7 @@ from peft import LoraConfig
 import transformers
 import os
 from utils.auto_load import MyAutoModel, MyAutoSFTTrainer, MyAutoProcessor
-from utils.common import get_vision_tower, prepare_tokenizer, safe_save_model_for_hf_trainer
+from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
 
@@ -41,7 +41,7 @@ class ScriptArguments:
     )
 
     freeze_vision_tower: bool = field(default=True)
-
+    merge_peft_model: bool = field(default=False)
 @dataclass
 class LoraArguments:
     lora_r: int = 64
@@ -114,7 +114,6 @@ if __name__ == "__main__":
             if hasattr(vision_tower, "attn_pool"): # follow Qwen-VL default setting
                 vision_tower.attn_pool.requires_grad_(True)
 
-    model.config.label_pad_token_id = script_args.label_pad_token_id
     model.config.use_cache = False
     lora_config = None
     if training_args.use_lora:
@@ -136,7 +135,7 @@ if __name__ == "__main__":
 
     processor = MyAutoProcessor.from_pretrained(script_args.model_name_or_path)
 
-    prepare_tokenizer(processor.tokenizer, "train")
+    processor.train()
 
     local_rank = training_args.local_rank
     dataset = make_vlfeedback_instruction_dataset(local_rank, script_args.data_dir)
@@ -153,5 +152,9 @@ if __name__ == "__main__":
 
     sft_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     sft_trainer.save_state()
-    safe_save_model_for_hf_trainer(sft_trainer, training_args.output_dir)
+    safe_save_model_for_hf_trainer(sft_trainer, training_args.output_dir, lora_args.lora_bias)
     processor.save_pretrained(training_args.output_dir)
+    if script_args.merge_peft_model and training_args.use_lora:
+        merged_model = model.merge_peft_model()
+        merged_dir = os.path.join(training_args.output_dir, "merged")
+        merged_model.save_pretrained(merged_dir)

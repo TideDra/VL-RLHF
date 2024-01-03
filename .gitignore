@@ -6,3 +6,4 @@ ckpts
 api.json
 **/results/*
 **/answers/*
+*.ttf

@@ -75,3 +75,22 @@ class LlavaDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
 
 class QwenVLDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
     pass
+
+@dataclass
+class VLSFTDataCollatorWithPadding:
+    pad_token_id:int
+    label_pad_token_id:int
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        padded_batch = {}
+        for k in features[0].keys():
+            to_pad = [torch.LongTensor(ex[k]) for ex in features]
+            if k == "input_ids":
+                padding_value = self.pad_token_id
+            elif k == "labels":
+                padding_value = self.label_pad_token_id
+            elif k == "attention_mask":
+                padding_value = 0
+            else:
+                raise ValueError(f"Unexpected key in batch '{k}'")
+            padded_batch[k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+        return padded_batch

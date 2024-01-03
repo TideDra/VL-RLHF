@@ -231,7 +231,6 @@ class MyAutoSFTTrainer(Trainer):
         model_name_or_path: str = None,
         model: PreTrainedModel | Module | str = None,
         args: TrainingArguments = None,
-        data_collator: Any | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
@@ -248,7 +247,6 @@ class MyAutoSFTTrainer(Trainer):
         return trainer(
             model,
             args,
-            data_collator,
             train_dataset,
             eval_dataset,
             processor,
@@ -265,7 +263,6 @@ class MyAutoSFTTrainer(Trainer):
         model_name_or_path: str = None,
         model: PreTrainedModel | Module | str = None,
         args: TrainingArguments = None,
-        data_collator: Any | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
