@@ -10,7 +10,7 @@ from utils.auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAut
 from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
-
+from transformers.trainer_callback import TrainerCallback
 
 # transformers.logging.set_verbosity_info()
 # Define and parse arguments.
@@ -64,7 +64,6 @@ class ScriptArguments:
     )
 
     freeze_vision_tower: bool = field(default=True)
-    merge_peft_model: bool = field(default=True)
 
 @dataclass
 class LoraArguments:
@@ -93,6 +92,14 @@ class TrainingArguments(transformers.TrainingArguments):
         default="llava-1.5-7b-dpo", metadata={"help": "wandb group name"}
     )
     resume_from_checkpoint: Optional[bool] = field(default=None)
+
+class PeftSavingCallback(TrainerCallback):
+    def on_save(self, args, state, control, **kwargs):
+        checkpoint_path = os.path.join(args.output_dir, f"checkpoint-{state.global_step}")
+        kwargs["model"].save_pretrained(checkpoint_path)
+
+        if "pytorch_model.bin" in os.listdir(checkpoint_path):
+            os.remove(os.path.join(checkpoint_path, "pytorch_model.bin"))
 
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, TrainingArguments, LoraArguments))
@@ -191,13 +198,11 @@ if __name__ == "__main__":
         data_collator=data_collator,
         peft_config=lora_config
     )
+    if training_args.use_lora:
+        dpo_trainer.add_callback(PeftSavingCallback())
     dpo_trainer.use_dpo_data_collator = True
 
     dpo_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     dpo_trainer.save_state()
     safe_save_model_for_hf_trainer(dpo_trainer, training_args.output_dir)
     processor.save_pretrained(training_args.output_dir)
-    if script_args.merge_peft_model and training_args.use_lora:
-        merged_model = model.merge_peft_model()
-        merged_dir = os.path.join(training_args.output_dir, "merged")
-        merged_model.save_pretrained(merged_dir)
