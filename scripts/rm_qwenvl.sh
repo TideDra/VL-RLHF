@@ -1,5 +1,5 @@
-per_device_train_batch_size=4
-gradient_accumulation_steps=8
+per_device_train_batch_size=32
+gradient_accumulation_steps=1
 epoch=3
 margin=-1
 lr=1e-5
@@ -7,7 +7,7 @@ gpu_number=$(nvidia-smi --list-gpus | wc -l)
 global_bs=$((per_device_train_batch_size * gradient_accumulation_steps * gpu_number))
 name="bs_${global_bs}_ep_${epoch}_mg_${margin}_bt_${beta}_lr_${lr}"
 accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gpu_number\
-        dpo.py \
+        reward_modeling.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
         --output_dir ckpts/Qwen-VL-Chat-rm/$name \
         --data_dir data_dir/VLFeedback \
@@ -38,7 +38,7 @@ accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gp
         --save_strategy "epoch" \
         --save_total_limit 1 \
         --logging_first_step True \
-        --logging_steps 10 \
+        --logging_steps 5 \
         --report_to wandb \
         --run_name  $name\
         --project_name "VL-RLHF" \

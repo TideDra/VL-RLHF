@@ -32,7 +32,8 @@ accelerate launch --config_file accelerate_config/zero3.yaml --num_processes $gp
         --tf32 True \
         --remove_unused_columns False \
         --max_length 2048 \
-        --save_strategy "epoch" \
+        --save_strategy "steps" \
+        --save_steps 1000 \
         --save_total_limit 1 \
         --logging_first_step True \
         --logging_steps 1 \

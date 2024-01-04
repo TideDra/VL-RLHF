@@ -4,7 +4,6 @@ from transformers import (
     AutoModelForCausalLM,
     DataCollator,
     PreTrainedModel,
-    PreTrainedTokenizerBase,
 )
 from components.collator import (
     LlavaDPODataCollatorWithPadding,
@@ -15,6 +14,7 @@ from components.collator import (
     LlavaRMDataCollatorWithPadding,
     LlavaSFTDataCollatorWithPadding,
     QwenVLSFTDataCollatorWithPadding,
+    QwenVLRMDataCollatorWithPadding
 )
 from components.processor import LlavaProcessor, QwenVLProcessor, VLProcessor
 from components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer, VLDPOTrainer
@@ -22,7 +22,6 @@ from components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer, VLSFTTrain
 from components.rm_trainer import LlavaRMTrainer, QwenVLRMTrainer, VLRMTrainer
 from typing import Optional, Any, Union
 from functools import wraps
-from trl.trainer import DPOTrainer
 from trl import RewardConfig
 from typing import Callable, Dict, List, Literal, Optional, Tuple, Any
 from datasets import Dataset
@@ -37,16 +36,25 @@ from transformers import (
 )
 from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalLoopOutput, EvalPrediction
-from transformers import Trainer
 
-AUTOMODEL_MAP = {
+AUTO_MODEL_MAP = {
     "LlavaForConditionalGeneration": LlavaForRL,
     "QWenLMHeadModel": AutoModelForCausalLM,
 }
 
-AUTOCOLLATOR_MAP = {
+AUTO_DPOCOLLATOR_MAP = {
     "LlavaForConditionalGeneration": LlavaDPODataCollatorWithPadding,
     "QWenLMHeadModel": QwenVLDPODataCollatorWithPadding,
+}
+
+AUTO_SFTCOLLATOR_MAP = {
+    "LlavaForConditionalGeneration": LlavaSFTDataCollatorWithPadding,
+    "QWenLMHeadModel": QwenVLSFTDataCollatorWithPadding,
+}
+
+AUTO_RMCOLLATOR_MAP = {
+    "LlavaForConditionalGeneration": LlavaRMDataCollatorWithPadding,
+    "QWenLMHeadModel": QwenVLRMDataCollatorWithPadding,
 }
 
 AUTO_DPOTRAINER_MAP = {
@@ -54,7 +62,7 @@ AUTO_DPOTRAINER_MAP = {
     "QWenLMHeadModel": QwenVLDPOTrainer,
 }
 
-AUTOPROCESSOR_MAP = {
+AUTO_PROCESSOR_MAP = {
     "LlavaForConditionalGeneration": LlavaProcessor,
     "QWenLMHeadModel": QwenVLProcessor,
 }
@@ -64,7 +72,7 @@ AUTO_SFTTRAINER_MAP = {
     "QWenLMHeadModel": QwenVLSFTTrainer,
 }
 
-AUTOREWARDMODEL_MAP = {
+AUTO_REWARDMODEL_MAP = {
     "LlavaForConditionalGeneration": LlavaRewardModel,
     "QWenLMHeadModel": QwenVLRewardModel,
 }
@@ -81,7 +89,7 @@ class MyAutoModel:
     def from_pretrained(model_name_or_path, *model_args, **kwargs) -> PreTrainedModel:
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        return AUTOMODEL_MAP[architecture].from_pretrained(
+        return AUTO_MODEL_MAP[architecture].from_pretrained(
             model_name_or_path, trust_remote_code=True, *model_args, **kwargs
         )
 
@@ -92,7 +100,7 @@ class MyAutoRewardModel:
     def from_pretrained(model_name_or_path, *model_args, **kwargs) -> PreTrainedModel:
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        return AUTOREWARDMODEL_MAP[architecture].from_pretrained(
+        return AUTO_REWARDMODEL_MAP[architecture].from_pretrained(
             model_name_or_path, trust_remote_code=True, *model_args, **kwargs
         )
 
@@ -108,7 +116,7 @@ class MyAutoDPOCollator(VLDPODataCollatorWithPadding):
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        collator = AUTOCOLLATOR_MAP[architecture]
+        collator = AUTO_DPOCOLLATOR_MAP[architecture]
         return collator(pad_token_id, label_pad_token_id, is_encoder_decoder, processor)
 
     def __init__(
@@ -130,7 +138,7 @@ class MyAutoSFTCollator(VLSFTDataCollatorWithPadding):
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        collator = AUTOCOLLATOR_MAP[architecture]
+        collator = AUTO_SFTCOLLATOR_MAP[architecture]
         return collator(pad_token_id, label_pad_token_id)
     def __init__(
         self,
@@ -148,7 +156,7 @@ class MyAutoRMCollator(VLRMDataCollatorWithPadding):
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        collator = AUTOCOLLATOR_MAP[architecture]
+        collator = AUTO_RMCOLLATOR_MAP[architecture]
         return collator(pad_token_id)
     def __init__(
         self,
@@ -266,7 +274,7 @@ class MyAutoProcessor:
     def from_pretrained(model_name_or_path, **kwargs) -> VLProcessor:
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
-        return AUTOPROCESSOR_MAP[architecture](
+        return AUTO_PROCESSOR_MAP[architecture](
             model_name_or_path, trust_remote_code=True, **kwargs
         )
 
@@ -353,15 +361,15 @@ class MyAutoRMTrainer(VLRMTrainer):
         cls,
         model_name_or_path: str = None,
         model: PreTrainedModel | Module = None,
-        data_collator: DataCollator | None = None,
         args: RewardConfig | None = None,
+        data_collator: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
         max_length: int | None = None,
         peft_config: Dict | None = None,
@@ -373,8 +381,8 @@ class MyAutoRMTrainer(VLRMTrainer):
         trainer = AUTO_RMTRAINER_MAP[architecture]
         return trainer(
             model,
-            data_collator,
             args,
+            data_collator,
             train_dataset,
             eval_dataset,
             processor,
@@ -391,15 +399,15 @@ class MyAutoRMTrainer(VLRMTrainer):
         self,
         model_name_or_path: str = None,
         model: PreTrainedModel | Module = None,
-        data_collator: DataCollator | None = None,
         args: RewardConfig | None = None,
+        data_collator: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
         max_length: int | None = None,
         peft_config: Dict | None = None,

@@ -6,7 +6,7 @@ from transformers import HfArgumentParser, Trainer
 from peft import LoraConfig
 import transformers
 import os
-from utils.auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAutoProcessor
+from utils.auto_load import MyAutoModel, MyAutoDPOCollator, MyAutoDPOTrainer, MyAutoProcessor
 from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     dataset_split = dataset.train_test_split(test_size=0.005, seed=42)
     train_dataset = dataset_split["train"]
     eval_dataset = dataset_split["test"]
-    data_collator = MyAutoCollator(
+    data_collator = MyAutoDPOCollator(
         script_args.model_name_or_path,
         pad_token_id=processor.tokenizer.pad_token_id,
         label_pad_token_id=script_args.label_pad_token_id,

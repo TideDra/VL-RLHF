@@ -35,13 +35,13 @@ class VLRMTrainer(RewardTrainer,ABC):
         train_dataset = train_dataset.map(
             self.tokenize_row,
             remove_columns=train_dataset.column_names,
-            keep_in_memory=True
+            #keep_in_memory=True
         )
         if eval_dataset is not None:
             eval_dataset = eval_dataset.map(
                 self.tokenize_row,
                 remove_columns=eval_dataset.column_names,
-                keep_in_memory=True
+                #keep_in_memory=True
             )
 
         super().__init__(
@@ -56,10 +56,10 @@ class VLRMTrainer(RewardTrainer,ABC):
             callbacks,
             optimizers,
             preprocess_logits_for_metrics,
-            max_length,
+            None,
             peft_config,
         )
-
+        self.use_reward_data_collator = True # silence warning
     def tokenize_row(self,element):
         prompt = element["prompt"]
         chosen = element["chosen"]

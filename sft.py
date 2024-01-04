@@ -17,7 +17,7 @@ from loguru import logger
 @dataclass
 class ScriptArguments:
     """
-    The arguments for the DPO training script.
+    The arguments for the SFT training script.
     """
 
     data_dir: Optional[str] = field(

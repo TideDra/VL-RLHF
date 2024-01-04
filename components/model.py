@@ -138,36 +138,6 @@ class LlavaForRL(LlavaForConditionalGeneration):
         return_dict: Optional[bool] = None,
         logp_labels: Optional[torch.FloatTensor] = None,
     ) -> Union[Tuple, LlavaRLOutputWithPast]:
-        r"""
-        Args:
-            labels (`torch.LongTensor` of shape `(batch_size, sequence_length)`, *optional*):
-                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
-                config.vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
-                (masked), the loss is only computed for the tokens with labels in `[0, ..., config.vocab_size]`.
-
-        Returns:
-
-        Example:
-
-        ```python
-        >>> from PIL import Image
-        >>> import requests
-        >>> from transformers import AutoProcessor, LlavaForConditionalGeneration
-
-        >>> model = LlavaForConditionalGeneration.from_pretrained("llava-hf/llava-1.5-7b-hf")
-        >>> processor = AutoProcessor.from_pretrained("llava-hf/llava-1.5-7b-hf")
-
-        >>> prompt = "<image>\nUSER: What's the content of the image?\nASSISTANT:"
-        >>> url = "https://www.ilankelman.org/stopsigns/australia.jpg"
-        >>> image = Image.open(requests.get(url, stream=True).raw)
-
-        >>> inputs = processor(text=prompt, images=image, return_tensors="pt")
-
-        >>> # Generate
-        >>> generate_ids = model.generate(**inputs, max_length=30)
-        >>> processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
-        "\nUSER: What's the content of the image?\nASSISTANT: The image features a stop sign on a street corner"
-        ```"""
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -278,6 +248,7 @@ class LlavaForRL(LlavaForConditionalGeneration):
 
 class VLRewardModel(nn.Module,ABC):
     def __init__(self, base_model:PreTrainedModel, rm_head:nn.Linear|None = None):
+        super().__init__()
         self.base_model = base_model
         self.config = base_model.config
         hidden_size = self.base_model.config.hidden_size
@@ -288,11 +259,14 @@ class VLRewardModel(nn.Module,ABC):
         self.rm_head = rm_head.to(device)
     
     def forward(self,input_ids,attention_mask,*args,**kwargs):
-        outputs = self.base_model(input_ids=input_ids,attention_mask=attention_mask,return_dict=True,output_hidden_states=True,*args,**kwargs)
+        kwargs['output_hidden_states'] = True
+        kwargs['return_dict'] = True
+        outputs = self.base_model(input_ids=input_ids,attention_mask=attention_mask,*args,**kwargs)
         last_hidden_state = outputs.hidden_states[-1]
+        logits = outputs.logits
+        last_hidden_state = last_hidden_state + 0.0 * torch.mean(logits) #Hacking to make sure every parameter is used in the backward pass. Copy from Llava-RLHF
         last_hidden_state_at_the_end = last_hidden_state[:, -1, :]
-        last_hidden_state_at_the_end = last_hidden_state_at_the_end.type_as(self.reward_head.weight)
-        rewards = self.reward_head(last_hidden_state_at_the_end)
+        rewards = self.rm_head(last_hidden_state_at_the_end)
         return (rewards,) # return a tuple to be compatiable with RewardTrainer's compute_loss
     
     def save_pretrained(self,save_directory,is_main_process:bool = True, state_dict:dict|None=None,*args,**kwargs):
@@ -306,28 +280,33 @@ class VLRewardModel(nn.Module,ABC):
     def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
         raise NotImplementedError
 
+    def prepare_inputs_for_generation(self,*args,**kwargs):
+        # this method is used by PEFT
+        return self.base_model.prepare_inputs_for_generation(*args,**kwargs)
+
+    def gradient_checkpointing_enable(self,*args,**kwargs):
+        return self.base_model.gradient_checkpointing_enable(*args,**kwargs)
+
+    def _get_reward_head_from_pretrained(self,pretrained_model_name_or_path,hidden_size):
+        rm_head_path = os.path.join(pretrained_model_name_or_path,'rm_head.bin')
+        if os.path.exists(rm_head_path):
+            rm_head = nn.Linear(hidden_size, 1)
+            rm_head.load_state_dict(torch.load(rm_head_path))
+        else:
+            logger.info(f'No rm_head.bin found at {pretrained_model_name_or_path}. Make sure you are initializing reward model from a base model.')
+            rm_head = None
+        return rm_head
+    
 class LlavaRewardModel(VLRewardModel):
     @classmethod
     def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
         base_model = LlavaForRL.from_pretrained(pretrained_model_name_or_path,*args,**kwargs)
-        rm_head_path = os.path.join(pretrained_model_name_or_path,'rm_head.bin')
-        if os.path.exists(rm_head_path):
-            rm_head = nn.Linear(base_model.config.hidden_size, 1)
-            rm_head.load_state_dict(torch.load(rm_head_path))
-        else:
-            logger.info(f'No rm_head.bin found at {rm_head_path}. Make sure you are initialing reward model from a base model.')
-            rm_head = None
+        rm_head = cls._get_reward_head_from_pretrained(cls,pretrained_model_name_or_path,base_model.config.hidden_size)
         return cls(base_model,rm_head)
 
 class QwenVLRewardModel(VLRewardModel):
     @classmethod
     def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
         base_model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path,*args,**kwargs)
-        rm_head_path = os.path.join(pretrained_model_name_or_path,'rm_head.bin')
-        if os.path.exists(rm_head_path):
-            rm_head = nn.Linear(base_model.config.hidden_size, 1)
-            rm_head.load_state_dict(torch.load(rm_head_path))
-        else:
-            logger.info(f'No rm_head.bin found at {rm_head_path}. Make sure you are initialing reward model from a base model.')
-            rm_head = None
+        rm_head = cls._get_reward_head_from_pretrained(cls,pretrained_model_name_or_path,base_model.config.hidden_size)
         return cls(base_model,rm_head)

@@ -17,7 +17,7 @@ from transformers.trainer_callback import TrainerCallback
 @dataclass
 class ScriptArguments:
     """
-    The arguments for the DPO training script.
+    The arguments for the RM training script.
     """
 
     # data parameters
@@ -77,6 +77,7 @@ class TrainingArguments(transformers.TrainingArguments):
         default="Qwen-VL-Chat-rm", metadata={"help": "wandb group name"}
     )
     resume_from_checkpoint: Optional[bool] = field(default=None)
+    gradient_checkpointing_kwargs: Optional[Dict] = field(default_factory=lambda:{'use_reentrant': False})
 
 class PeftSavingCallback(TrainerCallback):
     def on_save(self, args, state, control, **kwargs):

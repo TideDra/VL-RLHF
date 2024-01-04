@@ -8,10 +8,6 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
     ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
 
     # make comparison pairs from completion list
-    if local_rank > 0:
-        print("Waiting for main process to perform the mapping")
-        torch.distributed.barrier()
-
     def make_batch_pairs(sample):
         converted_sample = defaultdict(list)
 
@@ -81,12 +77,8 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
         make_batch_pairs,
         batched=True,
         remove_columns=set(ds.column_names) - set(["prompt", "chosen", "rejected","img_path"]),
-        keep_in_memory=True
+        #keep_in_memory=True
     )
-
-    if local_rank == 0:
-        print("Loading results from main process")
-        torch.distributed.barrier()
 
     return ds
 
