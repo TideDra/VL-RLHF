@@ -1,0 +1,13 @@
+torch
+torchvision
+transformers
+peft
+deepspeed
+accelerate
+trl
+einops
+tiktoken
+matplotlib
+pillow
+transformers_stream_generator
+wandb
