@@ -35,8 +35,12 @@ def collator(batch):
     ids = [b['id'] for b in batch]
     questions = [b['question'] for b in batch]
     images = [b['image'] for b in batch]
-    prompt = [processor.format_multimodal_prompt(q,img) for q,img in zip(questions,images)]
-    inputs = processor(texts=prompt,images_path=images,padding_side='left')
+    if processor.__class__.__name__ == 'QwenVLProcessor':
+        # Without this prefix, the model works better.
+        prompt = [processor.format_multimodal_prompt(q,img).replace('Picture 1: ','') for q,img in zip(questions,images)]
+    else:
+        prompt = [processor.format_multimodal_prompt(q,img) for q,img in zip(questions,images)]
+    inputs = processor(texts=prompt,images_path=images,padding_side='left',check_format=False)
     return ids,inputs
 
 

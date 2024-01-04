@@ -9,7 +9,6 @@ from utils.common import pad_to_length
 import torch
 from transformers.tokenization_utils_base import BatchEncoding
 from transformers import PreTrainedTokenizerBase
-import pdb
 
 class VLProcessor(ABC):
     @abstractmethod
@@ -83,6 +82,7 @@ class VLProcessor(ABC):
         images_path: Optional[List[str]] = None,
         padding: bool = True,
         padding_side: Literal["right", "left"] = "right",
+        check_format: bool = True
     ) -> BatchEncoding:
         """Porcess raw texts and images into model input tensors. Currently only support single turn conversation generation.
 
@@ -93,12 +93,11 @@ class VLProcessor(ABC):
             padding_side (Literal["right","left"], optional): Which side to pad. Defaults to "right".
         """
         #! this abstractmethod does not process images. Subclass should implement this method to process images.
-        if images_path is not None:
+        if images_path is not None and check_format:
             is_multimodal_prompt_valid = True
             for i in range(len(texts)):
                 if not self.is_multimodal_prompt_valid(texts[i]):
                     is_multimodal_prompt_valid = False
-                    pdb.set_trace()
                     texts[i] = self.format_multimodal_prompt(texts[i], images_path[i])
             if not is_multimodal_prompt_valid:
                 logger.warning(
@@ -194,8 +193,9 @@ class LlavaProcessor(VLProcessor):
         images_path: Optional[List[str]],
         padding: bool = True,
         padding_side: Literal["right", "left"] = "right",
+        check_format: bool = True
     ):
-        inputs = super().__call__(texts, images_path, padding, padding_side)
+        inputs = super().__call__(texts, images_path, padding, padding_side, check_format)
         images = [Image.open(img_path).convert("RGB") for img_path in images_path]
         inputs["pixel_values"] = self.image_processor(
             images=images, return_tensors="pt"
@@ -370,5 +370,6 @@ class QwenVLProcessor(VLProcessor):
         images_path: Optional[List[str]] = None,
         padding: bool = True,
         padding_side: Literal["right", "left"] = "right",
+        check_format: bool = True
     ):
-        return super().__call__(texts, images_path, padding, padding_side)
+        return super().__call__(texts, images_path, padding, padding_side,check_format)

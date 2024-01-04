@@ -6,7 +6,7 @@ from transformers import HfArgumentParser, Trainer
 from peft import LoraConfig
 import transformers
 import os
-from utils.auto_load import MyAutoModel, MyAutoCollator, MyAutoDPOTrainer, MyAutoProcessor
+from utils.auto_load import MyAutoRMCollator, MyAutoProcessor, MyAutoRewardModel, MyAutoRMTrainer
 from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
@@ -21,9 +21,6 @@ class ScriptArguments:
     """
 
     # data parameters
-    beta: Optional[float] = field(
-        default=0.1, metadata={"help": "the beta parameter for DPO loss"}
-    )
     score_margin: Optional[float] = field(
         default=-1,
         metadata={
@@ -41,18 +38,6 @@ class ScriptArguments:
     max_length: Optional[int] = field(
         default=512, metadata={"help": "max length of each sample"}
     )
-    max_prompt_length: Optional[int] = field(
-        default=128, metadata={"help": "max length of each sample's prompt"}
-    )
-    max_target_length: Optional[int] = field(
-        default=128,
-        metadata={
-            "help": "Only used for encoder decoder model. Max target of each sample's prompt"
-        },
-    )
-    label_pad_token_id: Optional[int] = field(
-        default=-100, metadata={"help": "label for non response tokens"}
-    )
 
     # debug argument for distributed training
     ignore_bias_buffers: Optional[bool] = field(
@@ -64,7 +49,6 @@ class ScriptArguments:
     )
 
     freeze_vision_tower: bool = field(default=True)
-    loss_type: str = field(default='sigmoid')
 
 @dataclass
 class LoraArguments:
@@ -75,7 +59,7 @@ class LoraArguments:
     lora_bias: str = "none"
     q_lora: bool = False
     bits: int = 4
-    modules_to_save: Optional[str] = field(default=None)
+    modules_to_save: Optional[str] = field(default='rm_head')
 
     def __post_init__(self):
         if self.lora_target_modules is not None:
@@ -90,7 +74,7 @@ class TrainingArguments(transformers.TrainingArguments):
         default="VL-RLHF", metadata={"help": "wandb project name"}
     )
     group_name: Optional[str] = field(
-        default="llava-1.5-7b-dpo", metadata={"help": "wandb group name"}
+        default="Qwen-VL-Chat-rm", metadata={"help": "wandb group name"}
     )
     resume_from_checkpoint: Optional[bool] = field(default=None)
 
@@ -129,7 +113,7 @@ if __name__ == "__main__":
         if len(training_args.fsdp) > 0 or deepspeed.is_deepspeed_zero3_enabled():
             logger.warning("FSDP or ZeRO3 are not incompatible with QLoRA.")
 
-    model = MyAutoModel.from_pretrained(
+    model = MyAutoRewardModel.from_pretrained(
         script_args.model_name_or_path,
         config=config,
         device_map=device_map,
@@ -138,7 +122,7 @@ if __name__ == "__main__":
         else None,
     )
     model.to(compute_dtype)
-    vision_tower = get_vision_tower(model)
+    vision_tower = get_vision_tower(model.base_model)
 
     if not training_args.use_lora:
         if script_args.freeze_vision_tower:
@@ -146,7 +130,6 @@ if __name__ == "__main__":
             if hasattr(vision_tower, "attn_pool"): # follow Qwen-VL default setting
                 vision_tower.attn_pool.requires_grad_(True)
 
-    model.config.label_pad_token_id = script_args.label_pad_token_id
     model.config.use_cache = False
     lora_config = None
     if training_args.use_lora:
@@ -175,36 +158,26 @@ if __name__ == "__main__":
     dataset_split = dataset.train_test_split(test_size=0.005, seed=42)
     train_dataset = dataset_split["train"]
     eval_dataset = dataset_split["test"]
-    data_collator = MyAutoCollator(
+    data_collator = MyAutoRMCollator(
         script_args.model_name_or_path,
         pad_token_id=processor.tokenizer.pad_token_id,
-        label_pad_token_id=script_args.label_pad_token_id,
-        is_encoder_decoder=model.config.is_encoder_decoder,
-        processor=processor
     )
 
-    dpo_trainer = MyAutoDPOTrainer(
+    rm_trainer = MyAutoRMTrainer(
         script_args.model_name_or_path,
         model=model,
         args=training_args,
-        beta=script_args.beta,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         processor=processor,
         max_length=script_args.max_length,
-        max_target_length=script_args.max_target_length,
-        max_prompt_length=script_args.max_prompt_length,
-        generate_during_eval=True,
-        label_pad_token_id=script_args.label_pad_token_id,
         data_collator=data_collator,
         peft_config=lora_config,
-        loss_type=script_args.loss_type
     )
     if training_args.use_lora:
-        dpo_trainer.add_callback(PeftSavingCallback())
-    dpo_trainer.use_dpo_data_collator = True
+        rm_trainer.add_callback(PeftSavingCallback())
 
-    dpo_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-    dpo_trainer.save_state()
-    safe_save_model_for_hf_trainer(dpo_trainer, training_args.output_dir)
+    rm_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+    rm_trainer.save_state()
+    safe_save_model_for_hf_trainer(rm_trainer, training_args.output_dir)
     processor.save_pretrained(training_args.output_dir)

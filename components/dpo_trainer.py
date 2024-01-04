@@ -23,7 +23,7 @@ class VLDPOTrainer(DPOTrainer, ABC):
         ref_model: PreTrainedModel | Module | str | None = None,
         beta: float = 0.1,
         label_smoothing: float = 0,
-        loss_type: Literal["sigmoid", "hinge", "ipo", "kto"] = "sigmoid",
+        loss_type: Literal["sigmoid", "hinge", "ipo", "kto_pair"] = "sigmoid",
         args: TrainingArguments = None,
         data_collator: Any | None = None,
         label_pad_token_id: int = -100,

@@ -1,16 +1,29 @@
-from components.model import LlavaForRL
-from transformers import AutoConfig, AutoModelForCausalLM, PreTrainedModel
+from components.model import LlavaForRL, LlavaRewardModel, QwenVLRewardModel
+from transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    DataCollator,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 from components.collator import (
     LlavaDPODataCollatorWithPadding,
     QwenVLDPODataCollatorWithPadding,
     VLDPODataCollatorWithPadding,
+    VLSFTDataCollatorWithPadding,
+    VLRMDataCollatorWithPadding,
+    LlavaRMDataCollatorWithPadding,
+    LlavaSFTDataCollatorWithPadding,
+    QwenVLSFTDataCollatorWithPadding,
 )
 from components.processor import LlavaProcessor, QwenVLProcessor, VLProcessor
-from components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer
-from components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer
-from typing import Optional, Any
+from components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer, VLDPOTrainer
+from components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer, VLSFTTrainer
+from components.rm_trainer import LlavaRMTrainer, QwenVLRMTrainer, VLRMTrainer
+from typing import Optional, Any, Union
 from functools import wraps
 from trl.trainer import DPOTrainer
+from trl import RewardConfig
 from typing import Callable, Dict, List, Literal, Optional, Tuple, Any
 from datasets import Dataset
 from torch._tensor import Tensor
@@ -51,6 +64,16 @@ AUTO_SFTTRAINER_MAP = {
     "QWenLMHeadModel": QwenVLSFTTrainer,
 }
 
+AUTOREWARDMODEL_MAP = {
+    "LlavaForConditionalGeneration": LlavaRewardModel,
+    "QWenLMHeadModel": QwenVLRewardModel,
+}
+
+AUTO_RMTRAINER_MAP = {
+    "LlavaForConditionalGeneration": LlavaRMTrainer,
+    "QWenLMHeadModel": QwenVLRMTrainer,
+}
+
 
 class MyAutoModel:
     @staticmethod
@@ -63,7 +86,18 @@ class MyAutoModel:
         )
 
 
-class MyAutoCollator(VLDPODataCollatorWithPadding):
+class MyAutoRewardModel:
+    @staticmethod
+    @wraps(AutoModelForCausalLM.from_pretrained)
+    def from_pretrained(model_name_or_path, *model_args, **kwargs) -> PreTrainedModel:
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = config.architectures[0]
+        return AUTOREWARDMODEL_MAP[architecture].from_pretrained(
+            model_name_or_path, trust_remote_code=True, *model_args, **kwargs
+        )
+
+
+class MyAutoDPOCollator(VLDPODataCollatorWithPadding):
     def __new__(
         cls,
         model_name_or_path: str,
@@ -87,8 +121,43 @@ class MyAutoCollator(VLDPODataCollatorWithPadding):
     ):
         ...
 
+class MyAutoSFTCollator(VLSFTDataCollatorWithPadding):
+    def __new__(
+        cls,
+        model_name_or_path: str,
+        pad_token_id:int,
+        label_pad_token_id:int
+    ):
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = config.architectures[0]
+        collator = AUTOCOLLATOR_MAP[architecture]
+        return collator(pad_token_id, label_pad_token_id)
+    def __init__(
+        self,
+        model_name_or_path: str,
+        pad_token_id:int,
+        label_pad_token_id:int
+    ):
+        ...
 
-class MyAutoDPOTrainer(DPOTrainer):
+class MyAutoRMCollator(VLRMDataCollatorWithPadding):
+    def __new__(
+        cls,
+        model_name_or_path: str,
+        pad_token_id: int = 0,
+    ):
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = config.architectures[0]
+        collator = AUTOCOLLATOR_MAP[architecture]
+        return collator(pad_token_id)
+    def __init__(
+        self,
+        model_name_or_path: str,
+        pad_token_id: int = 0,
+    ):
+        ...
+
+class MyAutoDPOTrainer(VLDPOTrainer):
     def __new__(
         cls,
         model_name_or_path: str = None,
@@ -96,7 +165,7 @@ class MyAutoDPOTrainer(DPOTrainer):
         ref_model: PreTrainedModel | Module | str | None = None,
         beta: float = 0.1,
         label_smoothing: float = 0,
-        loss_type: Literal["sigmoid", "hinge", "ipo", "kto"] = "sigmoid",
+        loss_type: Literal["sigmoid", "hinge", "ipo", "kto_pair"] = "sigmoid",
         args: TrainingArguments = None,
         data_collator: Any | None = None,
         label_pad_token_id: int = -100,
@@ -225,12 +294,13 @@ class MyAutoGenerationConfig:
         return generation_config
 
 
-class MyAutoSFTTrainer(Trainer):
+class MyAutoSFTTrainer(VLSFTTrainer):
     def __new__(
         cls,
         model_name_or_path: str = None,
-        model: PreTrainedModel | Module | str = None,
+        model: PreTrainedModel | Module = None,
         args: TrainingArguments = None,
+        data_collator: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
@@ -238,7 +308,7 @@ class MyAutoSFTTrainer(Trainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
@@ -247,6 +317,7 @@ class MyAutoSFTTrainer(Trainer):
         return trainer(
             model,
             args,
+            data_collator,
             train_dataset,
             eval_dataset,
             processor,
@@ -261,8 +332,9 @@ class MyAutoSFTTrainer(Trainer):
     def __init__(
         self,
         model_name_or_path: str = None,
-        model: PreTrainedModel | Module | str = None,
+        model: PreTrainedModel | Module = None,
         args: TrainingArguments = None,
+        data_collator: Callable[[List[Dict[str, Any]]], Dict[str, Any]] | None = None,
         train_dataset: Dataset | None = None,
         eval_dataset: Dataset | Dict[str, Dataset] | None = None,
         processor: VLProcessor | None = None,
@@ -270,7 +342,66 @@ class MyAutoSFTTrainer(Trainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
+        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
+        preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
+    ):
+        ...
+
+
+class MyAutoRMTrainer(VLRMTrainer):
+    def __new__(
+        cls,
+        model_name_or_path: str = None,
+        model: PreTrainedModel | Module = None,
+        data_collator: DataCollator | None = None,
+        args: RewardConfig | None = None,
+        train_dataset: Dataset | None = None,
+        eval_dataset: Dataset | Dict[str, Dataset] | None = None,
+        processor: VLProcessor | None = None,
+        model_init: Callable[[], PreTrainedModel] | None = None,
+        compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
+        callbacks: List[TrainerCallback] | None = None,
         optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
+        max_length: int | None = None,
+        peft_config: Dict | None = None,
+    ):
+        config = AutoConfig.from_pretrained(
+            model_name_or_path, trust_remote_code=True
+        )
+        architecture = config.architectures[0]
+        trainer = AUTO_RMTRAINER_MAP[architecture]
+        return trainer(
+            model,
+            data_collator,
+            args,
+            train_dataset,
+            eval_dataset,
+            processor,
+            model_init,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+            max_length,
+            peft_config,
+        )
+
+    def __init__(
+        self,
+        model_name_or_path: str = None,
+        model: PreTrainedModel | Module = None,
+        data_collator: DataCollator | None = None,
+        args: RewardConfig | None = None,
+        train_dataset: Dataset | None = None,
+        eval_dataset: Dataset | Dict[str, Dataset] | None = None,
+        processor: VLProcessor | None = None,
+        model_init: Callable[[], PreTrainedModel] | None = None,
+        compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
+        callbacks: List[TrainerCallback] | None = None,
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
+        preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
+        max_length: int | None = None,
+        peft_config: Dict | None = None,
     ):
         ...

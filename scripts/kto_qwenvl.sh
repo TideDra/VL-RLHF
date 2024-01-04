@@ -10,7 +10,7 @@ name="bs_${global_bs}_ep_${epoch}_mg_${margin}_bt_${beta}_lr_${lr}"
 accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gpu_number\
         dpo.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
-        --output_dir ckpts/Qwen-VL-Chat-dpo/$name \
+        --output_dir ckpts/Qwen-VL-Chat-kto/$name \
         --data_dir data_dir/VLFeedback \
         --use_lora True \
         --lora_r 64 \
@@ -31,6 +31,7 @@ accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gp
         --gradient_checkpointing True \
         --bf16 True \
         --tf32 True \
+        --loss_type "kto_pair" \
         --score_margin $margin \
         --remove_unused_columns False \
         --beta $beta \
@@ -46,4 +47,4 @@ accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gp
         --report_to wandb \
         --run_name  $name\
         --project_name "VL-RLHF" \
-        --group_name "Qwen-VL-Chat-dpo" \
+        --group_name "Qwen-VL-Chat-kto" \

@@ -6,7 +6,7 @@ from transformers import HfArgumentParser, Trainer
 from peft import LoraConfig
 import transformers
 import os
-from utils.auto_load import MyAutoModel, MyAutoSFTTrainer, MyAutoProcessor
+from utils.auto_load import MyAutoModel, MyAutoSFTTrainer, MyAutoProcessor, MyAutoSFTCollator
 from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
@@ -140,11 +140,12 @@ if __name__ == "__main__":
     local_rank = training_args.local_rank
     dataset = make_vlfeedback_instruction_dataset(local_rank, script_args.data_dir)
 
-
+    collator = MyAutoSFTCollator(script_args.max_length, processor.tokenizer.pad_token_id, -100)
     sft_trainer = MyAutoSFTTrainer(
         model_name_or_path=script_args.model_name_or_path,
         model=model,
         args=training_args,
+        data_collator=collator,
         train_dataset=dataset,
         processor=processor,
         max_seq_length=script_args.max_length,

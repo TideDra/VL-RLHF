@@ -74,10 +74,10 @@ class LlavaDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
         padded_batch['pixel_values'] = self.processor.image_processor(images=imgs,return_tensors="pt",padding=True)['pixel_values']
 
 class QwenVLDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
-    pass
+    ...
 
 @dataclass
-class VLSFTDataCollatorWithPadding:
+class VLSFTDataCollatorWithPadding(abc.ABC):
     pad_token_id:int
     label_pad_token_id:int
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -94,3 +94,41 @@ class VLSFTDataCollatorWithPadding:
                 raise ValueError(f"Unexpected key in batch '{k}'")
             padded_batch[k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
         return padded_batch
+
+@dataclass
+class LlavaSFTDataCollatorWithPadding(VLSFTDataCollatorWithPadding):
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        padded_batch = super().__call__(features)
+        imgs = [Image.open(img_path).convert('RGB') for img_path in padded_batch["img_path"]]
+        padded_batch['pixel_values'] = self.processor.image_processor(images=imgs,return_tensors="pt",padding=True)['pixel_values']
+
+@dataclass
+class QwenVLSFTDataCollatorWithPadding(VLSFTDataCollatorWithPadding):
+    ...
+
+@dataclass
+class VLRMDataCollatorWithPadding(abc.ABC):
+    pad_token_id:int
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        padded_batch = {}
+        for k in features[0].keys():
+            to_pad = [torch.LongTensor(ex[k]) for ex in features]
+            if k.startswith("input_ids"):
+                padding_value = self.pad_token_id
+            elif k.startswith("attention_mask"):
+                padding_value = 0
+            else:
+                raise ValueError(f"Unexpected key in batch '{k}'")
+            padded_batch[k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+        return padded_batch
+
+@dataclass
+class LlavaRMDataCollatorWithPadding(VLRMDataCollatorWithPadding):
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        padded_batch = super().__call__(features)
+        imgs = [Image.open(img_path).convert('RGB') for img_path in padded_batch["img_path"]]
+        padded_batch['pixel_values'] = self.processor.image_processor(images=imgs,return_tensors="pt",padding=True)['pixel_values']
+
+@dataclass
+class QwenVLRMDataCollatorWithPadding(VLRMDataCollatorWithPadding):
+    ...

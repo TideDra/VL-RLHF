@@ -4,6 +4,11 @@ from typing import Optional, List, Union, Tuple
 from transformers.modeling_outputs import ModelOutput
 from dataclasses import dataclass
 from torch import nn
+from transformers import PreTrainedModel,AutoModelForCausalLM
+import os
+from functools import wraps
+from abc import ABC,abstractclassmethod
+from loguru import logger
 @dataclass
 # Copied from transformers.models.idefics.modeling_idefics.IdeficsCausalLMOutputWithPast with Idefics->Llava
 class LlavaRLOutputWithPast(ModelOutput):
@@ -270,3 +275,59 @@ class LlavaForRL(LlavaForConditionalGeneration):
             attentions=outputs.attentions,
             logp_labels=final_logp_labels
         )
+
+class VLRewardModel(nn.Module,ABC):
+    def __init__(self, base_model:PreTrainedModel, rm_head:nn.Linear|None = None):
+        self.base_model = base_model
+        self.config = base_model.config
+        hidden_size = self.base_model.config.hidden_size
+        if rm_head is None:
+            rm_head = nn.Linear(hidden_size, 1)
+            nn.init.zeros_(rm_head.bias)
+        device = next(base_model.parameters()).device
+        self.rm_head = rm_head.to(device)
+    
+    def forward(self,input_ids,attention_mask,*args,**kwargs):
+        outputs = self.base_model(input_ids=input_ids,attention_mask=attention_mask,return_dict=True,output_hidden_states=True,*args,**kwargs)
+        last_hidden_state = outputs.hidden_states[-1]
+        last_hidden_state_at_the_end = last_hidden_state[:, -1, :]
+        last_hidden_state_at_the_end = last_hidden_state_at_the_end.type_as(self.reward_head.weight)
+        rewards = self.reward_head(last_hidden_state_at_the_end)
+        return (rewards,) # return a tuple to be compatiable with RewardTrainer's compute_loss
+    
+    def save_pretrained(self,save_directory,is_main_process:bool = True, state_dict:dict|None=None,*args,**kwargs):
+        if state_dict:
+            state_dict = {k.replace('base_model.',''):v for k,v in state_dict.items() if k.startswith('base_model.')}
+        self.base_model.save_pretrained(save_directory,*args,**kwargs)
+        torch.save(self.rm_head.state_dict(),os.path.join(save_directory,'rm_head.bin'))
+    
+    @abstractclassmethod
+    @wraps(AutoModelForCausalLM.from_pretrained)
+    def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
+        raise NotImplementedError
+
+class LlavaRewardModel(VLRewardModel):
+    @classmethod
+    def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
+        base_model = LlavaForRL.from_pretrained(pretrained_model_name_or_path,*args,**kwargs)
+        rm_head_path = os.path.join(pretrained_model_name_or_path,'rm_head.bin')
+        if os.path.exists(rm_head_path):
+            rm_head = nn.Linear(base_model.config.hidden_size, 1)
+            rm_head.load_state_dict(torch.load(rm_head_path))
+        else:
+            logger.info(f'No rm_head.bin found at {rm_head_path}. Make sure you are initialing reward model from a base model.')
+            rm_head = None
+        return cls(base_model,rm_head)
+
+class QwenVLRewardModel(VLRewardModel):
+    @classmethod
+    def from_pretrained(cls,pretrained_model_name_or_path,*args,**kwargs):
+        base_model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path,*args,**kwargs)
+        rm_head_path = os.path.join(pretrained_model_name_or_path,'rm_head.bin')
+        if os.path.exists(rm_head_path):
+            rm_head = nn.Linear(base_model.config.hidden_size, 1)
+            rm_head.load_state_dict(torch.load(rm_head_path))
+        else:
+            logger.info(f'No rm_head.bin found at {rm_head_path}. Make sure you are initialing reward model from a base model.')
+            rm_head = None
+        return cls(base_model,rm_head)
