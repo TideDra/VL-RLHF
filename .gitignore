@@ -3,7 +3,7 @@ __pycache__
 *.ipynb
 data_dir
 ckpts
-api.json
+*api.json
 **/results/*
 **/answers/*
 *.ttf

@@ -6,7 +6,8 @@ import torch
 import os
 from tqdm import tqdm
 import argparse
-
+from collections import defaultdict
+import pandas as pd
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, default="/mnt/gozhang/data_dir/mm-vet")
@@ -29,15 +30,19 @@ class MMVetDataset(Dataset):
     def __getitem__(self, index):
         return {'id':self.data[index][0],
                 'image':os.path.join(self.data_root,'images',self.data[index][1]['imagename']),
-                'question':self.data[index][1]['question']}
+                'question':self.data[index][1]['question'],
+                'answer':self.data[index][1]['answer'],
+                'category':','.join(self.data[index][1]['capability'])}
 
 def collator(batch):
     ids = [b['id'] for b in batch]
+    categories = [b['category'] for b in batch]
+    answers = [b['answer'] for b in batch]
     questions = [b['question'] for b in batch]
     images = [b['image'] for b in batch]
     prompt = [processor.format_multimodal_prompt(q,img) for q,img in zip(questions,images)]
     inputs = processor(texts=prompt,images_path=images,padding_side='left',check_format=False)
-    return ids,inputs
+    return ids,answers,questions,categories,inputs
 
 
 if __name__ == "__main__":
@@ -52,17 +57,24 @@ if __name__ == "__main__":
     dataset = MMVetDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
     generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
-    results = {}
+    results = defaultdict(list)
+    json_results = {}
     bar = tqdm(total=len(dataset))
     model.eval()
     with torch.inference_mode():
-        for ids, inputs in dataloader:
+        for ids, answers,questions,categories,inputs in dataloader:
             inputs.to('cuda')
             outputs = model.generate(**inputs,generation_config=generation_config,use_cache=True)
             input_token_len = inputs['input_ids'].shape[1]
             responses=tokenizer.batch_decode(outputs[:, input_token_len:], skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            for id,res in zip(ids,responses):
-                results[id]=res
+            for id,answer,question,category,res in zip(ids,answers,questions,categories,responses):
+                results['index'].append(id)
+                results['answer'].append(answer)
+                results['question'].append(question)
+                results['prediction'].append(res)
+                results['category'].append(category)
+                json_results[id] = res
             bar.update(len(responses))
+    #pd.DataFrame(results).to_excel('mmvet_result.xlsx')
     with open(args.output_path,'w') as f:
         json.dump(results,f,indent=4)

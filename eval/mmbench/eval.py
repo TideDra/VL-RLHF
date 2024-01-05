@@ -11,14 +11,15 @@ from collections import defaultdict
 import tempfile
 from time import time
 import os
-
+from vlmeval import multiple_choice_eval
+import json
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, default=None)
     parser.add_argument("--model_path", type=str, default="/mnt/gozhang/ckpts/llava-1.5-7b-hf")
     parser.add_argument("--output_path", type=str, default="mmbench_result.xlsx")
     parser.add_argument("--batch_size", type=int, default=16)
-
+    parser.add_argument("--api_info_path", type=str, default=None)
     return parser.parse_args()
 
 
@@ -141,3 +142,9 @@ if __name__ == "__main__":
 
     answer_upload = pd.DataFrame(answer_upload)
     answer_upload.to_excel(args.output_path,index=False)
+    with open(args.api_info_path, 'r') as f:
+        api_info = json.load(f)
+    api = api_info[0]
+    os.environ['OPENAI_API_KEY']=api['api_key']
+    os.environ['OPENAI_ENDPOINT']=api['end_point']
+    multiple_choice_eval(args.output_path,dataset='MMBench_DEV_EN')

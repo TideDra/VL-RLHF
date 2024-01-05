@@ -9,4 +9,4 @@ mkdir -p ./eval/mmhal/results
 python eval/mmhal/eval_gpt4.py \
     --response ./eval/mmhal/answers/${TAG}.json \
     --evaluation ./eval/mmhal/results/${TAG}.json \
-    --api_info_path ./eval/mmhal/api.json \
+    --api_info_path ./eval/mmhal/gpt4_0613_api.json \
