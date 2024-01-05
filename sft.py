@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     sft_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     sft_trainer.save_state()
-    safe_save_model_for_hf_trainer(sft_trainer, training_args.output_dir, lora_args.lora_bias)
+    safe_save_model_for_hf_trainer(sft_trainer, training_args.output_dir, lora_args)
     processor.save_pretrained(training_args.output_dir)
     if script_args.merge_peft_model and training_args.use_lora:
         merged_model = model.merge_peft_model()

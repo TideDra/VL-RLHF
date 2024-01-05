@@ -206,5 +206,5 @@ if __name__ == "__main__":
 
     dpo_trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
     dpo_trainer.save_state()
-    safe_save_model_for_hf_trainer(dpo_trainer, training_args.output_dir)
+    safe_save_model_for_hf_trainer(dpo_trainer, training_args.output_dir,lora_args)
     processor.save_pretrained(training_args.output_dir)
