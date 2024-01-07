@@ -1,5 +1,5 @@
 import transformers
-from abc import abstractmethod, ABC
+from abc import abstractmethod, ABC,abstractclassmethod
 from transformers.trainer_pt_utils import LabelSmoother
 from typing import List, Dict, Union, Literal, Optional
 import re
@@ -45,6 +45,13 @@ class VLProcessor(ABC):
     def format_multimodal_prompt(
         prompt: str, img_paths: Optional[Union[List[str],str]] = None
     ):  # * add image placeholder or source to prompt. must be used in VLDPOTrainer.tokenize_row
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def remove_image_placeholder(
+        prompt: str
+    ):  # remove image placeholder from prompt.
         raise NotImplementedError
 
     @staticmethod
@@ -151,6 +158,8 @@ class LlavaProcessor(VLProcessor):
         return self.processor.save_pretrained(output_dir)
 
     def process_batch_conv(self, sources, system_message):
+        if not isinstance(sources,list) or not isinstance(sources[0],list):
+            raise ValueError("sources must be a batch of conversations, eg. List[List[Dict]]")
         roles = {"user": "USER: ", "assistant": "ASSISTANT: "}
         raw_texts = []
         for source in sources:
@@ -174,6 +183,10 @@ class LlavaProcessor(VLProcessor):
         if img_paths is None:
             return prompt
         return "<image>\n" + prompt
+
+    @staticmethod
+    def remove_image_placeholder(prompt: str):
+        return prompt.replace("<image>\n", "")
 
     @staticmethod
     def is_multimodal_prompt_valid(prompt: str):
@@ -225,6 +238,8 @@ class QwenVLProcessor(VLProcessor):
     def process_batch_conv(
         self, sources: List[List[Dict]], system_message="You are a helpful assistant."
     ):
+        if not isinstance(sources,list) or not isinstance(sources[0],list):
+            raise ValueError("sources must be a batch of conversations, eg. List[List[Dict]]")
         # FIXME: not know whether this code support multi-turn conversation
         IGNORE_TOKEN_ID = LabelSmoother.ignore_index
         roles = {"user": "<|im_start|>user", "assistant": "<|im_start|>assistant"}
@@ -350,6 +365,10 @@ class QwenVLProcessor(VLProcessor):
             out.append(f"Picture {i + 1}: <img>{img_path}</img>\n")
         out.append(prompt.strip())
         return "".join(out)
+
+    @staticmethod
+    def remove_image_placeholder(prompt: str):
+        return re.sub(QwenVLProcessor.__multimodal_prompt_pattern, "", prompt)
 
     @staticmethod
     def is_multimodal_prompt_valid(prompt: str):

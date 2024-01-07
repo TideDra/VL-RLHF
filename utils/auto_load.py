@@ -1,4 +1,12 @@
-from components.model import LlavaForRL, LlavaRewardModel, QwenVLRewardModel
+from components.model import (
+    LlavaForRL,
+    LlavaRewardModel,
+    QwenVLRewardModel,
+    LlavaWithValueHead,
+    QwenVLWithValueHead,
+    VLModelWithValueHead,
+    VLRewardModel,
+)
 from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -14,20 +22,24 @@ from components.collator import (
     LlavaRMDataCollatorWithPadding,
     LlavaSFTDataCollatorWithPadding,
     QwenVLSFTDataCollatorWithPadding,
-    QwenVLRMDataCollatorWithPadding
+    QwenVLRMDataCollatorWithPadding,
+    VLPPODataCollator,
+    LlavaPPODataCollator,
+    QwenVLPPODataCollator
 )
 from components.processor import LlavaProcessor, QwenVLProcessor, VLProcessor
 from components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer, VLDPOTrainer
 from components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer, VLSFTTrainer
 from components.rm_trainer import LlavaRMTrainer, QwenVLRMTrainer, VLRMTrainer
+from components.ppo_trainer import LlavaPPOTrainer, QwenVLPPOTrainer, VLPPOTrainer
 from typing import Optional, Any, Union
 from functools import wraps
-from trl import RewardConfig
+from trl import PPOConfig, RewardConfig
 from typing import Callable, Dict, List, Literal, Optional, Tuple, Any
 from datasets import Dataset
 from torch._tensor import Tensor
 from torch.nn.modules import Module
-from torch.optim.lr_scheduler import LambdaLR
+from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 from torch.optim.optimizer import Optimizer as Optimizer
 from transformers.generation import GenerationConfig
 from transformers import (
@@ -57,6 +69,11 @@ AUTO_RMCOLLATOR_MAP = {
     "QWenLMHeadModel": QwenVLRMDataCollatorWithPadding,
 }
 
+AUTO_PPOCOLLATOR_MAP = {
+    "LlavaForConditionalGeneration": LlavaPPODataCollator,
+    "QWenLMHeadModel": QwenVLPPODataCollator,
+}
+
 AUTO_DPOTRAINER_MAP = {
     "LlavaForConditionalGeneration": LlavaDPOTrainer,
     "QWenLMHeadModel": QwenVLDPOTrainer,
@@ -82,6 +99,16 @@ AUTO_RMTRAINER_MAP = {
     "QWenLMHeadModel": QwenVLRMTrainer,
 }
 
+AUTO_PPOTRAINER_MAP = {
+    "LlavaForConditionalGeneration": LlavaPPOTrainer,
+    "QWenLMHeadModel": QwenVLPPOTrainer,
+}
+
+AUTO_MODELWITHVALUEHEAD_MAP = {
+    "LlavaForConditionalGeneration": LlavaWithValueHead,
+    "QWenLMHeadModel": QwenVLWithValueHead,
+}
+
 
 class MyAutoModel:
     @staticmethod
@@ -104,6 +131,16 @@ class MyAutoRewardModel:
             model_name_or_path, trust_remote_code=True, *model_args, **kwargs
         )
 
+
+class MyAutoModelWithValueHead:
+    @staticmethod
+    @wraps(VLModelWithValueHead.from_pretrained)
+    def from_pretrained(model_name_or_path, *model_args, **kwargs) -> PreTrainedModel:
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = config.architectures[0]
+        return AUTO_MODELWITHVALUEHEAD_MAP[architecture].from_pretrained(
+            model_name_or_path, trust_remote_code=True, *model_args, **kwargs
+        )
 
 class MyAutoDPOCollator(VLDPODataCollatorWithPadding):
     def __new__(
@@ -129,24 +166,21 @@ class MyAutoDPOCollator(VLDPODataCollatorWithPadding):
     ):
         ...
 
+
 class MyAutoSFTCollator(VLSFTDataCollatorWithPadding):
     def __new__(
-        cls,
-        model_name_or_path: str,
-        pad_token_id:int,
-        label_pad_token_id:int
+        cls, model_name_or_path: str, pad_token_id: int, label_pad_token_id: int
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
         collator = AUTO_SFTCOLLATOR_MAP[architecture]
         return collator(pad_token_id, label_pad_token_id)
+
     def __init__(
-        self,
-        model_name_or_path: str,
-        pad_token_id:int,
-        label_pad_token_id:int
+        self, model_name_or_path: str, pad_token_id: int, label_pad_token_id: int
     ):
         ...
+
 
 class MyAutoRMCollator(VLRMDataCollatorWithPadding):
     def __new__(
@@ -158,10 +192,27 @@ class MyAutoRMCollator(VLRMDataCollatorWithPadding):
         architecture = config.architectures[0]
         collator = AUTO_RMCOLLATOR_MAP[architecture]
         return collator(pad_token_id)
+
     def __init__(
         self,
         model_name_or_path: str,
         pad_token_id: int = 0,
+    ):
+        ...
+
+class MyAutoPPOCollator(VLPPODataCollator):
+    def __new__(
+        cls,
+        model_name_or_path: str,
+    ):
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = config.architectures[0]
+        collator = AUTO_PPOCOLLATOR_MAP[architecture]
+        return collator()
+
+    def __init__(
+        self,
+        model_name_or_path: str,
     ):
         ...
 
@@ -316,7 +367,7 @@ class MyAutoSFTTrainer(VLSFTTrainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
     ):
         config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
@@ -350,7 +401,7 @@ class MyAutoSFTTrainer(VLSFTTrainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
     ):
         ...
@@ -369,14 +420,12 @@ class MyAutoRMTrainer(VLRMTrainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
         max_length: int | None = None,
         peft_config: Dict | None = None,
     ):
-        config = AutoConfig.from_pretrained(
-            model_name_or_path, trust_remote_code=True
-        )
+        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
         architecture = config.architectures[0]
         trainer = AUTO_RMTRAINER_MAP[architecture]
         return trainer(
@@ -407,9 +456,60 @@ class MyAutoRMTrainer(VLRMTrainer):
         model_init: Callable[[], PreTrainedModel] | None = None,
         compute_metrics: Callable[[EvalPrediction], Dict] | None = None,
         callbacks: List[TrainerCallback] | None = None,
-        optimizers: Tuple[Optimizer, LambdaLR] = (None,None),
+        optimizers: Tuple[Optimizer, LambdaLR] = (None, None),
         preprocess_logits_for_metrics: Callable[[Tensor, Tensor], Tensor] | None = None,
         max_length: int | None = None,
         peft_config: Dict | None = None,
+    ):
+        ...
+
+
+class MyAutoPPOTrainer(VLPPOTrainer):
+    def __new__(
+        cls,
+        model_name_or_path: str = None,
+        config: PPOConfig = None,
+        model: VLModelWithValueHead = None,
+        ref_model: VLModelWithValueHead | None = None,
+        reward_model: VLRewardModel | None = None,
+        processor: VLProcessor | None = None,
+        dataset: Any | Dataset | None = None,
+        optimizer: Optimizer | None = None,
+        data_collator: Optional[Callable] = None,
+        num_shared_layers: int | None = None,
+        lr_scheduler: _LRScheduler | None = None,
+        generation_kwargs: dict = ...,
+    ):
+        model_config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+        architecture = model_config.architectures[0]
+        trainer = AUTO_PPOTRAINER_MAP[architecture]
+        return trainer(
+            config,
+            model,
+            ref_model,
+            reward_model,
+            processor,
+            dataset,
+            optimizer,
+            data_collator,
+            num_shared_layers,
+            lr_scheduler,
+            generation_kwargs
+        )
+
+    def __init__(
+        self,
+        model_name_or_path: str = None,
+        config: PPOConfig = None,
+        model: VLModelWithValueHead = None,
+        ref_model: VLModelWithValueHead | None = None,
+        reward_model: VLRewardModel | None = None,
+        processor: VLProcessor | None = None,
+        dataset: Any | Dataset | None = None,
+        optimizer: Optimizer | None = None,
+        data_collator: Optional[Callable] = None,
+        num_shared_layers: int | None = None,
+        lr_scheduler: _LRScheduler | None = None,
+        generation_kwargs: dict = ...,
     ):
         ...

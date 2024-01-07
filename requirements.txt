@@ -11,5 +11,7 @@ matplotlib
 pillow
 transformers_stream_generator
 wandb
+jsonlines
+scikit-learn
 git+https://github.com/TideDra/GPTFactory
 git+https://github.com/TideDra/VLMEvalKit

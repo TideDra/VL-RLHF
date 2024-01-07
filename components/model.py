@@ -9,6 +9,7 @@ import os
 from functools import wraps
 from abc import ABC,abstractclassmethod
 from loguru import logger
+from trl import AutoModelForCausalLMWithValueHead
 @dataclass
 # Copied from transformers.models.idefics.modeling_idefics.IdeficsCausalLMOutputWithPast with Idefics->Llava
 class LlavaRLOutputWithPast(ModelOutput):
@@ -310,3 +311,48 @@ class QwenVLRewardModel(VLRewardModel):
         base_model = AutoModelForCausalLM.from_pretrained(pretrained_model_name_or_path,*args,**kwargs)
         rm_head = cls._get_reward_head_from_pretrained(cls,pretrained_model_name_or_path,base_model.config.hidden_size)
         return cls(base_model,rm_head)
+
+class VLModelWithValueHead(AutoModelForCausalLMWithValueHead, ABC):
+    supported_rm_modules = ("rm_head",)
+    def enable_input_require_grads(self):
+        return self.pretrained_model.enable_input_require_grads()
+    
+    def get_input_embeddings(self):
+        return self.pretrained_model.get_input_embeddings()
+    
+    def compute_reward_score(self, input_ids, attention_mask=None, **kwargs):
+        r"""
+        Computes the reward score for a given input. The method has first to enable the adapter
+        and then compute the reward score. After that the model disables the reward modeling
+        adapter and enables the default ppo adapter again.
+        """
+        if not self.supports_rm_adapter:
+            raise ValueError("This model does not support reward modeling adapter.")
+
+        # enable rm adapter
+        self.pretrained_model.set_adapter(self.rm_adapter_name)
+        self.pretrained_model.eval()
+
+        with torch.no_grad():
+            base_model_output = self.pretrained_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+                **kwargs,
+            )
+
+            last_hidden_states = base_model_output.hidden_states[-1]
+            last_hidden_state_at_the_end = last_hidden_states[:, -1, :] # add this to be compatiable with our VLRewardModel
+            scores = self.score(last_hidden_state_at_the_end)
+
+        self.pretrained_model.set_adapter(self.policy_adapter_name)
+        self.pretrained_model.eval()
+
+        return scores
+
+class LlavaWithValueHead(VLModelWithValueHead):
+    transformers_parent_class = LlavaForRL
+
+class QwenVLWithValueHead(VLModelWithValueHead):
+    transformers_parent_class = AutoModelForCausalLM

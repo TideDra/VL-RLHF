@@ -7,3 +7,4 @@ ckpts
 **/results/*
 **/answers/*
 *.ttf
+.vscode

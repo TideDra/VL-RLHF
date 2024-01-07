@@ -1,9 +1,11 @@
 from datasets import load_dataset
-import torch
 from collections import defaultdict
 from itertools import combinations
 import numpy as np
 from components.processor import VLProcessor
+from datasets import Dataset
+import json
+import os
 def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:float = -1):
     ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
 
@@ -129,3 +131,13 @@ def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
     #    torch.distributed.barrier()
 
     return ds
+
+def build_dataset_from_vlquery_json(local_rank:int,json_path:str,image_root:str):
+    with open(json_path,'r') as f:
+        raw_data = json.load(f)
+    def gen():
+        for data in raw_data:
+            data['image'] = os.path.join(image_root,data['image'])
+            yield data
+    dataset = Dataset.from_generator(gen)
+    return dataset

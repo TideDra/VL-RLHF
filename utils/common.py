@@ -4,6 +4,8 @@ from transformers import Trainer
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 from transformers import deepspeed
+from trl import PPOTrainer
+import os
 def maybe_zero_3(param):
     if hasattr(param, "ds_id"):
         assert param.ds_status == ZeroParamStatus.NOT_AVAILABLE
@@ -86,6 +88,7 @@ def safe_save_model_for_hf_trainer(
 ):
     """Collects the state dict and dump to disk."""
     # check if zero3 mode enabled
+    #? why if-else?
     if deepspeed.is_deepspeed_zero3_enabled():
         state_dict = trainer.model_wrapped._zero3_consolidated_16bit_state_dict()
     else:
@@ -97,3 +100,23 @@ def safe_save_model_for_hf_trainer(
             state_dict = trainer.model.state_dict()
     if trainer.args.should_save and trainer.args.local_rank == 0:
         trainer._save(output_dir, state_dict=state_dict)
+
+def safe_save_model_for_ppo_trainer(
+    trainer: PPOTrainer, output_dir: str, lora_args:None
+):
+    """Collects the state dict and dump to disk."""
+    # check if zero3 mode enabled
+    if trainer.config.local_rank != 0:
+        return
+    os.makedirs(output_dir, exist_ok=True)
+    unwrapped_model = trainer.accelerator.unwrap_model(trainer.model)
+    if trainer.config.use_lora:
+        v_head = unwrapped_model.state_dict()
+        torch.save(v_head,os.path.join(output_dir,"pytorch_model.bin"))
+        state_dict = get_peft_state_maybe_zero_3(
+            unwrapped_model.pretrained_model.named_parameters(), lora_args
+        )
+        unwrapped_model.pretrained_model.save_pretrained(output_dir,state_dict=state_dict)
+    else:
+        trainer._save_pretrained(output_dir)
+    trainer.tokenizer.save_pretrained(output_dir)

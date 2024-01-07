@@ -3,9 +3,10 @@ from torch.nn.utils.rnn import pad_sequence
 import torch
 from PIL import Image
 from dataclasses import dataclass
-import abc
+from abc import ABC
+from collections import defaultdict
 @dataclass
-class VLDPODataCollatorWithPadding(abc.ABC):
+class VLDPODataCollatorWithPadding(ABC):
     r"""
     DPO DataCollator class that pads the tokenized inputs to the maximum length of the batch.
     Args:
@@ -77,7 +78,7 @@ class QwenVLDPODataCollatorWithPadding(VLDPODataCollatorWithPadding):
     ...
 
 @dataclass
-class VLSFTDataCollatorWithPadding(abc.ABC):
+class VLSFTDataCollatorWithPadding(ABC):
     pad_token_id:int
     label_pad_token_id:int
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -107,7 +108,7 @@ class QwenVLSFTDataCollatorWithPadding(VLSFTDataCollatorWithPadding):
     ...
 
 @dataclass
-class VLRMDataCollatorWithPadding(abc.ABC):
+class VLRMDataCollatorWithPadding(ABC):
     pad_token_id:int
     def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
         padded_batch = {}
@@ -131,4 +132,30 @@ class LlavaRMDataCollatorWithPadding(VLRMDataCollatorWithPadding):
 
 @dataclass
 class QwenVLRMDataCollatorWithPadding(VLRMDataCollatorWithPadding):
+    ...
+
+@dataclass
+class VLPPODataCollator(ABC):
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        batch = {}
+        for key in features[0].keys():
+            for feature in features:
+                data = feature[key]
+                if key in ['input_ids','attention_mask']:
+                    data = torch.LongTensor(data)
+                if key not in batch:
+                    batch[key] = []
+                batch[key].append(data)
+        return batch
+
+@dataclass
+class LlavaPPODataCollator(VLPPODataCollator):
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        batch = super().__call__(features)
+        imgs = [Image.open(img_path).convert('RGB') for img_path in batch["img_path"]]
+        batch['pixel_values'] = self.processor.image_processor(images=imgs,return_tensors="pt",padding=True)['pixel_values']
+        return batch
+
+@dataclass
+class QwenVLPPODataCollator(VLPPODataCollator):
     ...
