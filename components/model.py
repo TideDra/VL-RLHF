@@ -10,6 +10,7 @@ from functools import wraps
 from abc import ABC,abstractclassmethod
 from loguru import logger
 from trl import AutoModelForCausalLMWithValueHead
+from peft import prepare_model_for_kbit_training, get_peft_model
 @dataclass
 # Copied from transformers.models.idefics.modeling_idefics.IdeficsCausalLMOutputWithPast with Idefics->Llava
 class LlavaRLOutputWithPast(ModelOutput):
@@ -314,6 +315,30 @@ class QwenVLRewardModel(VLRewardModel):
 
 class VLModelWithValueHead(AutoModelForCausalLMWithValueHead, ABC):
     supported_rm_modules = ("rm_head",)
+    def __init__(self, pretrained_model, **kwargs):
+        super().__init__(pretrained_model, **kwargs)
+        self.value_adapter_name = None
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        is_loaded_in_8bit = getattr(pretrained_model_name_or_path, "is_loaded_in_8bit", False)
+        is_loaded_in_4bit = getattr(pretrained_model_name_or_path, "is_loaded_in_4bit", False)
+        value_adapter_config = kwargs.pop("value_adapter_config", None)
+        value_adapter_name = kwargs.pop("value_adapter_name", 'value_adapter')
+        model = super().from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        pretrained_model = model.pretrained_model
+        if value_adapter_config is not None:
+            if model.is_peft_model:
+                pretrained_model.add_adapter(peft_config=value_adapter_config, adapter_name=value_adapter_name)
+            else:
+                if is_loaded_in_8bit or is_loaded_in_4bit:
+                    pretrained_model = prepare_model_for_kbit_training(
+                        pretrained_model,
+                        #**peft_quantization_kwargs, #TODO: add this to the config
+                    )
+                pretrained_model = get_peft_model(pretrained_model, value_adapter_config,adapter_name=value_adapter_name)
+            model.value_adapter_name = value_adapter_name
+        return model
+
     def enable_input_require_grads(self):
         return self.pretrained_model.enable_input_require_grads()
     
@@ -350,6 +375,69 @@ class VLModelWithValueHead(AutoModelForCausalLMWithValueHead, ABC):
         self.pretrained_model.eval()
 
         return scores
+
+    def forward(
+        self,
+        input_ids=None,
+        past_key_values=None,
+        attention_mask=None,
+        **kwargs,
+    ):
+        r"""
+        Applies a forward pass to the wrapped model and returns the logits of the value head.
+
+        Args:
+            input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
+                Indices of input sequence tokens in the vocabulary.
+            past_key_values (`tuple(tuple(torch.FloatTensor))`, `optional`):
+                Contains pre-computed hidden-states (key and values in the attention blocks) as computed by the model
+                (see `past_key_values` input) to speed up sequential decoding.
+            attention_mask (`torch.FloatTensor` of shape `(batch_size, sequence_length)`, `optional`):
+                Mask to avoid performing attention on padding token indices. Mask values selected in ``[0, 1]``:
+                - 1 for tokens that are **not masked**,
+                - 0 for tokens that are **masked**.
+            kwargs (`dict`, `optional`):
+                Additional keyword arguments, that are passed to the wrapped model.
+        """
+        kwargs["output_hidden_states"] = True  # this had already been set in the LORA / PEFT examples
+        kwargs["past_key_values"] = past_key_values
+
+        if self.is_peft_model and self.pretrained_model.active_peft_config.peft_type == "PREFIX_TUNING":
+            kwargs.pop("past_key_values")
+        if self.value_adapter_name is not None:
+            self.pretrained_model.set_adapter(self.value_adapter_name)
+            self.pretrained_model.eval()
+            value_model_output = self.pretrained_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                **kwargs,
+            )
+        if self.value_adapter_name is not None:
+            self.pretrained_model.set_adapter(self.policy_adapter_name)
+            self.pretrained_model.eval()
+        base_model_output = self.pretrained_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            **kwargs,
+        )
+
+        if self.value_adapter_name is None:
+            value_model_output = base_model_output
+        last_hidden_state = value_model_output.hidden_states[-1]
+        lm_logits = base_model_output.logits
+        loss = base_model_output.loss
+ 
+        if last_hidden_state.device != self.v_head.summary.weight.device:
+            last_hidden_state = last_hidden_state.to(self.v_head.summary.weight.device)
+
+        value = self.v_head(last_hidden_state).squeeze(-1)
+
+        # force upcast in fp32 if logits are in half-precision
+        if lm_logits.dtype != torch.float32:
+            lm_logits = lm_logits.float()
+
+        return (lm_logits, loss, value)
+
 
 class LlavaWithValueHead(VLModelWithValueHead):
     transformers_parent_class = LlavaForRL

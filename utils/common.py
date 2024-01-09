@@ -18,6 +18,8 @@ def maybe_zero_3(param):
 def get_peft_state_maybe_zero_3(named_params, lora_args):
     bias = lora_args.lora_bias
     def is_module_to_save(name):
+        if lora_args.modules_to_save is None:
+            return False
         for module_name in lora_args.modules_to_save:
             if module_name in name:
                 return True
@@ -106,8 +108,9 @@ def safe_save_model_for_ppo_trainer(
 ):
     """Collects the state dict and dump to disk."""
     # check if zero3 mode enabled
-    if trainer.config.local_rank != 0:
+    if not trainer.accelerator.is_main_process:
         return
+    print('saving')
     os.makedirs(output_dir, exist_ok=True)
     unwrapped_model = trainer.accelerator.unwrap_model(trainer.model)
     if trainer.config.use_lora:
@@ -120,3 +123,4 @@ def safe_save_model_for_ppo_trainer(
     else:
         trainer._save_pretrained(output_dir)
     trainer.tokenizer.save_pretrained(output_dir)
+    print('model saved')

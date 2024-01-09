@@ -12,6 +12,8 @@ from transformers import GPTQConfig, deepspeed
 from loguru import logger
 import trl
 from transformers.utils import is_torch_tf32_available
+import os
+from copy import deepcopy
 # transformers.logging.set_verbosity_info()
 # Define and parse arguments.
 @dataclass
@@ -63,6 +65,8 @@ class LoraArguments:
 @dataclass
 class PPOConfig(trl.PPOConfig):
     use_lora: bool = False
+    use_value_adapter: bool = False
+    #TODO: support stand-alone value model
     run_name: Optional[str] = field(default=None)
     project_name: Optional[str] = field(
         default="VL-RLHF", metadata={"help": "wandb project name"}
@@ -75,11 +79,13 @@ class PPOConfig(trl.PPOConfig):
     fp16: bool = field(default=False)
     bf16: bool = field(default=False)
     tf32: bool = field(default=False)
+    #TODO: support fsdp
     fsdp: str = field(default="",metadata={"help": "Fully Sharded Data Parallelism. This feature has not been implemented yet."})
     local_rank: int = field(default=-1,metadata={"help": "local rank for distributed training"})
     output_dir: Optional[str] = field(default=None,metadata={"help": "output directory"})
     per_device_gamelog_size: int = field(default=2,metadata={"help": "gamelog size per device"})
-    #FIXME: add optimizer and lr_scheduler
+    max_new_tokens: Optional[int] = field(default=None,metadata={"help": "max new tokens for generation"})
+    #TODO: add optimizer and lr_scheduler
     def __post_init__(self):
         super().__post_init__()
         self.tracker_project_name = self.project_name
@@ -99,12 +105,13 @@ class PPOConfig(trl.PPOConfig):
                     torch.backends.cudnn.allow_tf32 = False
         if self.per_device_gamelog_size > self.batch_size:
             raise ValueError("per_device_gamelog_size should be less than batch_size")
+        self.local_rank = int(os.environ.get("LOCAL_RANK", self.local_rank))
+        if self.use_value_adapter and not self.use_lora:
+            raise ValueError("You can only use value adapter with a Peft base model. Please set use_lora to True.")
 
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, PPOConfig, LoraArguments))
     script_args, ppo_config, lora_args = parser.parse_args_into_dataclasses()
-    #os.environ["WANDB_PROJECT"] = training_args.project_name
-    #os.environ["WANDB_RUN_GROUP"] = training_args.group_name
     compute_dtype = (
         torch.float16
         if ppo_config.fp16
@@ -149,6 +156,7 @@ if __name__ == "__main__":
         if ppo_config.use_lora and lora_args.q_lora
         else None,
         peft_config=lora_config,
+        value_adapter_config=deepcopy(lora_config) if ppo_config.use_value_adapter else None,
         reward_adapter=script_args.reward_adapter,
         reward_adapter_name=script_args.reward_adapter_name,
         v_head_init_strategy=script_args.v_head_init_strategy,
@@ -179,6 +187,8 @@ if __name__ == "__main__":
     generation_config = MyAutoGenerationConfig.from_pretrained(script_args.model_name_or_path)
     #? generation_config may need to be modified for ppo
     generation_config.top_p = 1.0
+    if ppo_config.max_new_tokens is not None:
+        generation_config.max_new_tokens = ppo_config.max_new_tokens
     data_collator = MyAutoPPOCollator(script_args.model_name_or_path)
     ppo_trainer = MyAutoPPOTrainer(
         script_args.model_name_or_path,
