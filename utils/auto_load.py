@@ -48,7 +48,9 @@ from transformers import (
 )
 from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalLoopOutput, EvalPrediction
-
+import os
+import json
+from peft import PeftModel
 AUTO_MODEL_MAP = {
     "LlavaForConditionalGeneration": LlavaForRL,
     "QWenLMHeadModel": AutoModelForCausalLM,
@@ -114,11 +116,24 @@ class MyAutoModel:
     @staticmethod
     @wraps(AutoModelForCausalLM.from_pretrained)
     def from_pretrained(model_name_or_path, *model_args, **kwargs) -> PreTrainedModel:
-        config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
-        architecture = config.architectures[0]
-        return AUTO_MODEL_MAP[architecture].from_pretrained(
-            model_name_or_path, trust_remote_code=True, *model_args, **kwargs
-        )
+        adapter_path = os.path.join(model_name_or_path, "adapter_config.json")
+        if os.path.exists(adapter_path):
+            with open(adapter_path, "r") as f:
+                adapter_config = json.load(f)
+            base_model_name = adapter_config["base_model_name_or_path"]
+            config = AutoConfig.from_pretrained(base_model_name, trust_remote_code=True)
+            architecture = config.architectures[0]
+            model = AUTO_MODEL_MAP[architecture].from_pretrained(
+                base_model_name, trust_remote_code=True, *model_args, **kwargs
+            )
+            peft_model = PeftModel.from_pretrained(model, model_name_or_path)
+            return peft_model
+        else:
+            config = AutoConfig.from_pretrained(model_name_or_path, trust_remote_code=True)
+            architecture = config.architectures[0]
+            return AUTO_MODEL_MAP[architecture].from_pretrained(
+                model_name_or_path, trust_remote_code=True, *model_args, **kwargs
+            )
 
 
 class MyAutoRewardModel:

@@ -412,7 +412,7 @@ class VLModelWithValueHead(AutoModelForCausalLMWithValueHead, ABC):
                 attention_mask=attention_mask,
                 **kwargs,
             )
-        if self.value_adapter_name is not None:
+
             self.pretrained_model.set_adapter(self.policy_adapter_name)
             self.pretrained_model.eval()
         base_model_output = self.pretrained_model(

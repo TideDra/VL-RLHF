@@ -13,6 +13,7 @@ from time import time
 import os
 from vlmeval import multiple_choice_eval
 import json
+from peft import PeftModel
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, default=None)
@@ -97,14 +98,18 @@ def collator(batch):
 if __name__ == "__main__":
     args = parse_args()
     data_root = args.data_root
-    processor = MyAutoProcessor.from_pretrained(args.model_path)
-    generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
-    tokenizer = processor.tokenizer
+    model_path = args.model_path
+    model = MyAutoModel.from_pretrained(model_path,torch_dtype=torch.bfloat16)
+    if isinstance(model,PeftModel):
+        model_path = model.peft_config['default'].base_model_name_or_path
+    processor = MyAutoProcessor.from_pretrained(model_path)
     processor.infer()
-    model = MyAutoModel.from_pretrained(args.model_path,torch_dtype=torch.bfloat16)
+    tokenizer = processor.tokenizer
+
     model.to('cuda')
     dataset = MMBenchDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
+    generation_config = MyAutoGenerationConfig.from_pretrained(model_path)
     results = defaultdict(list)
     bar = tqdm(total=len(dataset))
     model.eval()

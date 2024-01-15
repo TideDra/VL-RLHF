@@ -7,6 +7,7 @@ import os
 from tqdm import tqdm
 import argparse
 import jsonlines
+from peft import PeftModel
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, default=None)
@@ -47,14 +48,18 @@ def collator(batch):
 if __name__ == "__main__":
     args = parse_args()
     data_root = args.data_root
-    processor = MyAutoProcessor.from_pretrained(args.model_path)
+    model_path = args.model_path
+    model = MyAutoModel.from_pretrained(model_path,torch_dtype=torch.bfloat16)
+    if isinstance(model,PeftModel):
+        model_path = model.peft_config['default'].base_model_name_or_path
+    processor = MyAutoProcessor.from_pretrained(model_path)
     processor.infer()
     tokenizer = processor.tokenizer
-    model = MyAutoModel.from_pretrained(args.model_path,torch_dtype=torch.float16)
+
     model.to('cuda')
     dataset = MMEDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
-    generation_config = MyAutoGenerationConfig.from_pretrained(args.model_path)
+    generation_config = MyAutoGenerationConfig.from_pretrained(model_path)
     results = []
     bar = tqdm(total=len(dataset))
     model.eval()
