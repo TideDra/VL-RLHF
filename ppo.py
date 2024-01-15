@@ -85,6 +85,7 @@ class PPOConfig(trl.PPOConfig):
     output_dir: Optional[str] = field(default=None,metadata={"help": "output directory"})
     per_device_gamelog_size: int = field(default=2,metadata={"help": "gamelog size per device"})
     max_new_tokens: Optional[int] = field(default=None,metadata={"help": "max new tokens for generation"})
+    max_length: Optional[int] = field(default=None,metadata={"help": "max length for generation"})
     #TODO: add optimizer and lr_scheduler
     def __post_init__(self):
         super().__post_init__()
@@ -108,6 +109,8 @@ class PPOConfig(trl.PPOConfig):
         self.local_rank = int(os.environ.get("LOCAL_RANK", self.local_rank))
         if self.use_value_adapter and not self.use_lora:
             raise ValueError("You can only use value adapter with a Peft base model. Please set use_lora to True.")
+        if self.max_new_tokens is not None and self.max_length is not None:
+            raise ValueError("You can only use one of max_new_tokens and max_length")
 
 if __name__ == "__main__":
     parser = HfArgumentParser((ScriptArguments, PPOConfig, LoraArguments))
@@ -189,6 +192,9 @@ if __name__ == "__main__":
     generation_config.top_p = 1.0
     if ppo_config.max_new_tokens is not None:
         generation_config.max_new_tokens = ppo_config.max_new_tokens
+    if ppo_config.max_length is not None:
+        generation_config.max_length = ppo_config.max_length
+        generation_config.max_new_tokens = None
     data_collator = MyAutoPPOCollator(script_args.model_name_or_path)
     ppo_trainer = MyAutoPPOTrainer(
         script_args.model_name_or_path,
