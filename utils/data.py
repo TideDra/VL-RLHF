@@ -1,13 +1,18 @@
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from collections import defaultdict
 from itertools import combinations
 import numpy as np
 from components.processor import VLProcessor
 from datasets import Dataset
+from datasets.config import DATASET_STATE_JSON_FILENAME
+from pathlib import Path
 import json
 import os
 def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:float = -1):
-    ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
+    if Path(cache_dir, DATASET_STATE_JSON_FILENAME).exists():
+        ds = load_from_disk(cache_dir)
+    else:
+        ds = load_dataset(cache_dir, split="train",cache_dir=cache_dir,trust_remote_code=True)
 
     # make comparison pairs from completion list
     def make_batch_pairs(sample):
@@ -85,7 +90,10 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
     return ds
 
 def make_vlfeedback_instruction_dataset(local_rank:int,cache_dir:str):
-    ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
+    if Path(cache_dir, DATASET_STATE_JSON_FILENAME).exists():
+        ds = load_from_disk(cache_dir)
+    else:
+        ds = load_dataset(cache_dir, split="train",cache_dir=cache_dir,trust_remote_code=True)
 
     # make comparison pairs from completion list
     #if local_rank > 0:
