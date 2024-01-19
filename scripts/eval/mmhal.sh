@@ -2,6 +2,7 @@ export PYTHONPATH=$PYTHONPATH:$PWD
 mkdir -p ./eval/mmhal/answers
 python eval/mmhal/eval.py \
     --data_root ./data_dir/MMHal-Bench \
+    --processor_path ckpts/Qwen-VL-Chat \
     --model_path $CKPT \
     --output_path ./eval/mmhal/answers/${TAG}.json \
 

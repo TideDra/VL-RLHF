@@ -3,6 +3,7 @@ DATA_DIR=./data_dir/MME
 mkdir -p ./eval/mme/answers
 python eval/mme/eval.py \
     --data_root $DATA_DIR \
+    --processor_path ckpts/Qwen-VL-Chat \
     --model_path $CKPT \
     --output_path ./eval/mme/answers/${TAG}.jsonl \
 

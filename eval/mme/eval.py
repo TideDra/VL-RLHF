@@ -14,6 +14,7 @@ def parse_args():
     parser.add_argument("--model_path", type=str, default="/mnt/gozhang/ckpts/llava-1.5-7b-hf")
     parser.add_argument("--output_path", type=str, default="mme_result.json")
     parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--processor_path", type=str, default=None)
 
 
     return parser.parse_args()
@@ -52,11 +53,14 @@ if __name__ == "__main__":
     model = MyAutoModel.from_pretrained(model_path,torch_dtype=torch.bfloat16)
     if isinstance(model,PeftModel):
         model_path = model.peft_config['default'].base_model_name_or_path
-    processor = MyAutoProcessor.from_pretrained(model_path)
+    if args.processor_path is None:
+        args.processor_path = model_path
+    processor = MyAutoProcessor.from_pretrained(args.processor_path)
     processor.infer()
     tokenizer = processor.tokenizer
 
     model.to('cuda')
+    model.to(torch.bfloat16)
     dataset = MMEDataset(data_root)
     dataloader = DataLoader(dataset,batch_size=args.batch_size,collate_fn=collator)
     generation_config = MyAutoGenerationConfig.from_pretrained(model_path)
