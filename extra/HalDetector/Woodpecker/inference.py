@@ -19,17 +19,20 @@ if __name__ == '__main__':
 
     parser.add_argument('--api-key', type=str, help="API key for GPT service.")
     parser.add_argument('--end-point', type=str, help="API base link for GPT service.")
-
+    parser.add_argument('--api-service', type=str, help="GPT API service name. 'azure' or 'oai'.", default='azure')
+    parser.add_argument('--val-model-path', type=str, help="Path to the validation model checkpoint")
+    parser.add_argument('--qa2c-model-path', type=str, help="Path to the qa2claim model checkpoint")
     args = parser.parse_args()
     
     args_dict = {
         'api_key': args.api_key if args.api_key else "",
         'end_point':args.end_point if args.end_point else "",
-        'val_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/Qwen-VL-Chat",
-        'qa2c_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/zerofec-qa2claim-t5-base",
+        'val_model_path': args.val_model_path,
+        'qa2c_model_path': args.qa2c_model_path,
         'detector_config':args.detector_config,
         'detector_model_path':args.detector_model,
         'cache_dir': args.cache_dir,
+        'api_service': args.api_service
 
 }
 

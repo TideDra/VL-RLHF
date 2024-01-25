@@ -10,9 +10,9 @@ from typing import List, Dict
 import time
 from GPTFactory import GPT
 class Corrector:
-    def __init__(self, api_key=None,end_point=None,detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None) -> None:
+    def __init__(self, api_key=None,end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None) -> None:
         # init all the model
-        self.chatbot = GPT(model='abc',service='azure',api_key=api_key,end_point=end_point)
+        self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point)
         self.preprocessor = PreProcessor(self.chatbot)
         self.entity_extractor = EntityExtractor(self.chatbot)
         self.detector = Detector(detector_config,detector_model_path,cache_dir)
