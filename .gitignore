@@ -8,3 +8,4 @@ ckpts
 **/answers/*
 *.ttf
 .vscode
+*.pth

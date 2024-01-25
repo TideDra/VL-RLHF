@@ -1,0 +1,529 @@
+{
+    "img_path": "../../../data_dir/coco2017/test2017/000000497687.jpg",
+    "input_desc": "The image features a group of three friends standing close together, possibly at a bar or a party. Two of the friends are women, and they are both holding glasses with drinks in their hands. One of the women is holding a drink in her hand up close to the camera, while the other has her drink slightly farther away. The third friend is a young man wearing a tie, standing between the two women.\\n\\nThe group appears to be enjoying themselves, with smiles on their faces, and they are facing the camera. In the background, there is another person partially visible. The scene conveys a sense of camaraderie and fun among the friends.",
+    "query": "Describe this picture in detail.",
+    "split_sents": [
+        "The image features a group of three friends standing close together, possibly at a bar or a party.",
+        "Two of the friends are women, and the two women are both holding glasses with drinks in their hands.",
+        "One of the women is holding a drink in her hand up close to the camera, while the other has her drink slightly farther away.",
+        "The third friend is a young man wearing a tie, standing between the two women.",
+        "The group of three friends appears to be enjoying themselves, with smiles on their faces, and the group of three friends are facing the camera.",
+        "In the background, there is another person partially visible.",
+        "The scene conveys a sense of camaraderie and fun among the three friends."
+    ],
+    "orig_split_sents": [
+        "The image features a group of three friends standing close together, possibly at a bar or a party.",
+        "Two of the friends are women, and they are both holding glasses with drinks in their hands.",
+        "One of the women is holding a drink in her hand up close to the camera, while the other has her drink slightly farther away.",
+        "The third friend is a young man wearing a tie, standing between the two women.\\n\\nThe group appears to be enjoying themselves, with smiles on their faces, and they are facing the camera.",
+        "In the background, there is another person partially visible.",
+        "The scene conveys a sense of camaraderie and fun among the friends."
+    ],
+    "named_entity": [
+        "friends.bar.party",
+        "woman.glass.drink",
+        "woman.drink.camera",
+        "man.tie.woman",
+        "friends.camera",
+        "person",
+        "None"
+    ],
+    "entity_info": {
+        "friends": {
+            "total_count": 3,
+            "crop_path": [
+                "./cache_dir/mXwBTb2MvzQuAoumpm2ipB.png",
+                "./cache_dir/5SFuEoeS2jpM7Rpe2tJzw6.png",
+                "./cache_dir/XU9WScgqH5Zh2iPRofXkBD.png"
+            ],
+            "bbox": [
+                [
+                    0.374,
+                    0.297,
+                    0.934,
+                    0.998
+                ],
+                [
+                    0.002,
+                    0.227,
+                    0.374,
+                    0.997
+                ],
+                [
+                    0.177,
+                    0.001,
+                    0.533,
+                    0.958
+                ]
+            ]
+        },
+        "bar": {
+            "total_count": 0,
+            "crop_path": [],
+            "bbox": []
+        },
+        "party": {
+            "total_count": 1,
+            "crop_path": [
+                "./cache_dir/TaJB7FZf5WVmGBFcci5m8s.png"
+            ],
+            "bbox": [
+                [
+                    0.003,
+                    0.003,
+                    0.955,
+                    0.996
+                ]
+            ]
+        },
+        "woman": {
+            "total_count": 2,
+            "crop_path": [
+                "./cache_dir/5mwG2Ebw96bxQdmSqSLGwk.png",
+                "./cache_dir/dL9Permo6XpRmhimc8Urym.png"
+            ],
+            "bbox": [
+                [
+                    0.374,
+                    0.297,
+                    0.935,
+                    0.998
+                ],
+                [
+                    0.001,
+                    0.228,
+                    0.392,
+                    0.999
+                ]
+            ]
+        },
+        "glass": {
+            "total_count": 1,
+            "crop_path": [
+                "./cache_dir/H2u3JNtnTCf2mQNLkY2zTQ.png"
+            ],
+            "bbox": [
+                [
+                    0.378,
+                    0.827,
+                    0.491,
+                    0.98
+                ]
+            ]
+        },
+        "drink": {
+            "total_count": 1,
+            "crop_path": [
+                "./cache_dir/DogA9ASd3CjodC2zCuxwaq.png"
+            ],
+            "bbox": [
+                [
+                    0.379,
+                    0.827,
+                    0.491,
+                    0.98
+                ]
+            ]
+        },
+        "camera": {
+            "total_count": 0,
+            "crop_path": [],
+            "bbox": []
+        },
+        "man": {
+            "total_count": 1,
+            "crop_path": [
+                "./cache_dir/GGvbkJTKA8MQNk94yDFRa6.png"
+            ],
+            "bbox": [
+                [
+                    0.177,
+                    0.001,
+                    0.532,
+                    0.945
+                ]
+            ]
+        },
+        "tie": {
+            "total_count": 1,
+            "crop_path": [
+                "./cache_dir/jmVohtB9m2Z5pRawBejXLe.png"
+            ],
+            "bbox": [
+                [
+                    0.317,
+                    0.356,
+                    0.368,
+                    0.904
+                ]
+            ]
+        },
+        "person": {
+            "total_count": 4,
+            "crop_path": [
+                "./cache_dir/38zpEWQXs5txCZ4C3ynaRM.png",
+                "./cache_dir/K4Vdi3URziWGV2rR6kNN3k.png",
+                "./cache_dir/cJve3ALcxdrTDokb7jGD82.png",
+                "./cache_dir/UnRRWWyQLqEsZNYJ89xBGs.png"
+            ],
+            "bbox": [
+                [
+                    0.375,
+                    0.297,
+                    0.935,
+                    0.999
+                ],
+                [
+                    0.0,
+                    0.228,
+                    0.39,
+                    0.999
+                ],
+                [
+                    0.177,
+                    0.001,
+                    0.531,
+                    0.974
+                ],
+                [
+                    0.829,
+                    0.396,
+                    0.99,
+                    0.834
+                ]
+            ]
+        }
+    },
+    "entity_list": [
+        [
+            "friends",
+            "bar",
+            "party"
+        ],
+        [
+            "woman",
+            "glass",
+            "drink"
+        ],
+        [
+            "woman",
+            "drink",
+            "camera"
+        ],
+        [
+            "man",
+            "tie",
+            "woman"
+        ],
+        [
+            "friends",
+            "camera"
+        ],
+        [
+            "person"
+        ]
+    ],
+    "generated_questions": [
+        [
+            [
+                "Are the friends standing close together?",
+                "friends"
+            ],
+            [
+                "Where are the friends possibly located?",
+                "friends.party"
+            ]
+        ],
+        [
+            [
+                "What are the women holding?",
+                "woman"
+            ],
+            [
+                "What is in the glasses?",
+                "glass"
+            ],
+            [
+                "Are the women holding glasses?",
+                "woman.glass"
+            ]
+        ],
+        [
+            [
+                "What is one of the women holding?",
+                "woman"
+            ],
+            [
+                "Is the woman holding the drink close to the camera?",
+                "woman.drink"
+            ],
+            [
+                "Does the other woman have her drink farther away?",
+                "woman.drink"
+            ]
+        ],
+        [
+            [
+                "What is the man wearing?",
+                "man"
+            ],
+            [
+                "Is the man standing between two women?",
+                "man.woman"
+            ],
+            [
+                "What is the relationship of the man to the women?",
+                "man.woman"
+            ]
+        ],
+        [
+            [
+                "What are the friends doing?",
+                "friends"
+            ],
+            [
+                "Are the friends facing the camera?",
+                "friends"
+            ]
+        ],
+        [
+            [
+                "Is there a person visible in the background?",
+                "person"
+            ]
+        ]
+    ],
+    "generated_answers": [
+        {
+            "friends": [
+                [
+                    [
+                        "Are the friends standing close together?",
+                        "There is no existence of friends in the image description."
+                    ]
+                ],
+                [
+                    [
+                        "Are the friends standing close together?",
+                        "Yes, the two friends are standing close together, posing for a picture."
+                    ]
+                ],
+                [
+                    [
+                        "Are the friends standing close together?",
+                        "Yes, the friends are standing close together, posing for a picture."
+                    ]
+                ]
+            ],
+            "overall": [
+                [
+                    "Where are the friends possibly located?",
+                    "The friends are possibly located at a bar or a restaurant, as they are posing for a picture together while holding drinks."
+                ]
+            ]
+        },
+        {
+            "woman": [
+                [
+                    [
+                        "What are the women holding?",
+                        "The women are holding glasses filled with drinks."
+                    ]
+                ],
+                [
+                    [
+                        "What are the women holding?",
+                        "The women are holding a glass of wine."
+                    ]
+                ]
+            ],
+            "glass": [
+                [
+                    [
+                        "What is in the glasses?",
+                        "There are two glasses, and each glass contains a green liquid."
+                    ]
+                ]
+            ],
+            "overall": [
+                [
+                    "Are the women holding glasses?",
+                    "Yes, both women are holding glasses in their hands."
+                ]
+            ]
+        },
+        {
+            "woman": [
+                [
+                    [
+                        "What is one of the women holding?",
+                        "One of the women is holding a glass with a drink in it."
+                    ]
+                ],
+                [
+                    [
+                        "What is one of the women holding?",
+                        "One of the women is holding a drink."
+                    ]
+                ]
+            ],
+            "overall": [
+                [
+                    "Is the woman holding the drink close to the camera?",
+                    "Yes, the woman holding the drink is standing close to the camera."
+                ],
+                [
+                    "Does the other woman have her drink farther away?",
+                    "Yes, the other woman has her drink farther away from the camera."
+                ]
+            ]
+        },
+        {
+            "man": [
+                [
+                    [
+                        "What is the man wearing?",
+                        "The man is wearing a suit and a blue tie."
+                    ]
+                ]
+            ],
+            "overall": [
+                [
+                    "Is the man standing between two women?",
+                    "Yes, the man is standing between two women in the image."
+                ],
+                [
+                    "What is the relationship of the man to the women?",
+                    "The man is standing between the two women, and they are posing together for a picture. It is not possible to determine their exact relationship from the image alone, but they could be friends, colleagues, or acquaintances."
+                ]
+            ]
+        },
+        {
+            "friends": [
+                [
+                    [
+                        "What are the friends doing?",
+                        "The friends are hanging out together, socializing, and enjoying each other's company."
+                    ],
+                    [
+                        "Are the friends facing the camera?",
+                        "Yes, the two friends are facing the camera in the image."
+                    ]
+                ],
+                [
+                    [
+                        "What are the friends doing?",
+                        "The friends are standing next to each other, posing for a picture."
+                    ],
+                    [
+                        "Are the friends facing the camera?",
+                        "Yes, the two friends are facing the camera in the image."
+                    ]
+                ],
+                [
+                    [
+                        "What are the friends doing?",
+                        "The friends are posing together for a picture, likely at a party or social event."
+                    ],
+                    [
+                        "Are the friends facing the camera?",
+                        "Yes, the friends are facing the camera, posing together for a picture."
+                    ]
+                ]
+            ]
+        },
+        {
+            "person": [
+                [
+                    [
+                        "Is there a person visible in the background?",
+                        "There is no existence of a person in the background in the image description."
+                    ]
+                ],
+                [
+                    [
+                        "Is there a person visible in the background?",
+                        "There is no existence of a person in the background in the image description."
+                    ]
+                ],
+                [
+                    [
+                        "Is there a person visible in the background?",
+                        "Yes, there is a person visible in the background, behind the man and the two women."
+                    ]
+                ],
+                [
+                    [
+                        "Is there a person visible in the background?",
+                        "Yes, there is a person visible in the background of the image."
+                    ]
+                ]
+            ]
+        }
+    ],
+    "claim": {
+        "specific": {
+            "friends": [
+                [
+                    "There is no existence of friends in the image description are the friends standing close together.",
+                    "The friends are hanging out together, socializing, and enjoying each other's company.",
+                    "The friends are facing the camera."
+                ],
+                [
+                    "The friends are standing close together, posing for a picture.",
+                    "The friends are standing next to each other, posing for a picture.",
+                    "The friends are facing the camera."
+                ],
+                [
+                    "The friends are standing close together, posing for a picture.",
+                    "The friends are posing together for a picture, likely at a party or social event.",
+                    "The friends are facing the camera, posing together for a picture."
+                ]
+            ],
+            "woman": [
+                [
+                    "The women are holding glasses filled with drinks.",
+                    "One of the women is holding a glass with a drink in it."
+                ],
+                [
+                    "The women are holding a glass of wine.",
+                    "One of the women is holding a drink."
+                ]
+            ],
+            "glass": [
+                [
+                    "There are two glasses, and each glass contains a green liquid is in the glasses."
+                ]
+            ],
+            "man": [
+                [
+                    "The man is wearing a suit and a blue tie."
+                ]
+            ],
+            "person": [
+                [
+                    "There is no existence of a person in the background in the image description."
+                ],
+                [
+                    "There is no existence of a person in the background in the image description."
+                ],
+                [
+                    "There is a person visible in the background, behind the man and the two women."
+                ],
+                [
+                    "There is a person visible in the background."
+                ]
+            ]
+        },
+        "overall": [
+            "The friends are possibly located at a bar or a restaurant, as they are posing for a picture together while holding drinks.",
+            "The women are holding glasses in their hands.",
+            "The woman holding the drink is standing close to the camera.",
+            "The other woman has her drink farther away from the camera.",
+            "The man is standing between two women in the image.",
+            "The relationship of the man to the women is not possible to determine their exact relationship from the image alone, but they could be friends, colleagues, or acquaintances."
+        ],
+        "counting": "Counting: \nThere are 3 friends.\nfriends 1: [0.374, 0.297, 0.934, 0.998]\nfriends 2: [0.002, 0.227, 0.374, 0.997]\nfriends 3: [0.177, 0.001, 0.533, 0.958]\n\nThere is no bar.\n\nThere are 1 party.\nparty 1: [0.003, 0.003, 0.955, 0.996]\n\nThere are 2 woman.\nwoman 1: [0.374, 0.297, 0.935, 0.998]\nwoman 2: [0.001, 0.228, 0.392, 0.999]\n\nThere are 1 glass.\nglass 1: [0.378, 0.827, 0.491, 0.98]\n\nThere are 1 drink.\ndrink 1: [0.379, 0.827, 0.491, 0.98]\n\nThere is no camera.\n\nThere are 1 man.\nman 1: [0.177, 0.001, 0.532, 0.945]\n\nThere are 1 tie.\ntie 1: [0.317, 0.356, 0.368, 0.904]\n\nThere are 4 person.\nperson 1: [0.375, 0.297, 0.935, 0.999]\nperson 2: [0.0, 0.228, 0.39, 0.999]\nperson 3: [0.177, 0.001, 0.531, 0.974]\nperson 4: [0.829, 0.396, 0.99, 0.834]\n\n"
+    },
+    "output": "The image features a group of three friends([0.374, 0.297, 0.934, 0.998];[0.002, 0.227, 0.374, 0.997];[0.177, 0.001, 0.533, 0.958]) standing close together, possibly at a <f>bar</f><t>party([0.003, 0.003, 0.955, 0.996])</t>. Two of the friends are women([0.374, 0.297, 0.935, 0.998];[0.001, 0.228, 0.392, 0.999]), and they are both holding glasses([0.378, 0.827, 0.491, 0.98]) with drinks([0.379, 0.827, 0.491, 0.98]) in their hands. One of the women([0.374, 0.297, 0.935, 0.998]) is holding a drink in her hand up close to the camera, while the other has her drink slightly farther away. The third friend is a young man([0.177, 0.001, 0.532, 0.945]) wearing a tie([0.317, 0.356, 0.368, 0.904]), standing between the two women.\\n\\nThe group appears to be enjoying themselves, with smiles on their faces, and they are facing the camera. <f>In the background, there is another person partially visible.</f><t>There are other persons([0.375, 0.297, 0.935, 0.999];[0.0, 0.228, 0.39, 0.999];[0.177, 0.001, 0.531, 0.974];[0.829, 0.396, 0.99, 0.834]) visible in the background.</t> The scene conveys a sense of camaraderie and fun among the friends."
+}

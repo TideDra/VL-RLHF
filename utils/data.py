@@ -12,7 +12,7 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
     if Path(cache_dir, DATASET_STATE_JSON_FILENAME).exists():
         ds = load_from_disk(cache_dir)
     else:
-        ds = load_dataset(cache_dir, split="train",cache_dir=cache_dir,trust_remote_code=True)
+        ds = load_dataset("MMInstruction/VLFeedback", split="train",cache_dir=cache_dir,trust_remote_code=True)
 
     # make comparison pairs from completion list
     def make_batch_pairs(sample):
@@ -84,7 +84,7 @@ def make_vlfeedback_paired_dataset(local_rank:int,cache_dir:str,score_margin:flo
         make_batch_pairs,
         batched=True,
         remove_columns=set(ds.column_names) - set(["prompt", "chosen", "rejected","img_path"]),
-        #keep_in_memory=True
+        keep_in_memory=True
     )
 
     return ds

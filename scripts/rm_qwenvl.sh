@@ -1,16 +1,16 @@
-per_device_train_batch_size=32
+per_device_train_batch_size=16
 gradient_accumulation_steps=1
 epoch=3
-margin=-1
+margin=0
 lr=1e-5
 gpu_number=$(nvidia-smi --list-gpus | wc -l)
 global_bs=$((per_device_train_batch_size * gradient_accumulation_steps * gpu_number))
-name="bs_${global_bs}_ep_${epoch}_mg_${margin}_bt_${beta}_lr_${lr}"
+name="bs_${global_bs}_ep_${epoch}_mg_${margin}_lr_${lr}_vlfeedback20k"
 accelerate launch --config_file accelerate_config/zero2.yaml --num_processes $gpu_number\
         reward_modeling.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
         --output_dir ckpts/Qwen-VL-Chat-rm/$name \
-        --data_dir data_dir/VLFeedback \
+        --data_dir data_dir/VLFeedback_20k \
         --use_lora True \
         --lora_r 64 \
         --lora_alpha 16 \

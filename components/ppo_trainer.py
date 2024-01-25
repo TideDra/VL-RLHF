@@ -9,6 +9,8 @@ from tqdm import tqdm
 from abc import ABC
 import torch
 import wandb
+from loguru import logger
+from accelerate.utils import gather_object
 class VLPPOTrainer(PPOTrainer,ABC):
     def __init__(
         self,
@@ -99,13 +101,26 @@ class VLPPOTrainer(PPOTrainer,ABC):
                 return_tensors="pt",
             ).to(self.current_device)
             self.tokenizer.padding_side = padding_side_default
+            
             if self.accelerator.is_main_process:
                 bar.set_description_str("computing reward score")
-            if self.reward_model is not None:
-                with torch.no_grad():
-                    rewards = self.reward_model(**padded_inputs)[0]
-            else:
-                rewards = self.accelerator.unwrap_model(self.model).compute_reward_score(**padded_inputs) #compute_reward_score sets no_grad
+            skip_batch = False
+            try:
+                if self.reward_model is not None:
+                    with torch.no_grad():
+                        rewards = self.reward_model(**padded_inputs)[0]
+                else:
+                    rewards = self.accelerator.unwrap_model(self.model).compute_reward_score(**padded_inputs) #compute_reward_score sets no_grad
+            except Exception as e:
+                logger.warning("Error when computing reward score. Skip this batch. See the following exception for more details.")
+                logger.exception(e)
+                print(batch["response"])
+                skip_batch = True
+            skip_batch = [skip_batch]
+            gather_object(skip_batch)
+            if torch.tensor(skip_batch).any():
+                print(skip_batch)
+                continue
             # self.step needs a list of rewards, then it turn the list into a tensor again. This is really stupid.
             rewards = [reward for reward in rewards]
             #### Run PPO step
