@@ -139,6 +139,20 @@ if __name__ == "__main__":
     )
     model.to(compute_dtype)
     vision_tower = get_vision_tower(model)
+    ref_model = None
+    if deepspeed.is_deepspeed_zero3_enabled():
+        ref_model = MyAutoModel.from_pretrained(
+            script_args.model_name_or_path,
+            config=config,
+            device_map=device_map,
+            quantization_config=GPTQConfig(bits=lora_args.bits, disable_exllama=True)
+            if training_args.use_lora and lora_args.q_lora
+            else None,
+        )
+        ref_model.to(compute_dtype)
+        ref_model.requires_grad_(False)
+        ref_model.use_cache = False
+        ref_model.config.label_pad_token_id = script_args.label_pad_token_id
 
     if not training_args.use_lora:
         if script_args.freeze_vision_tower:
@@ -194,11 +208,12 @@ if __name__ == "__main__":
         max_length=script_args.max_length,
         max_target_length=script_args.max_target_length,
         max_prompt_length=script_args.max_prompt_length,
-        generate_during_eval=True,
+        generate_during_eval=False,
         label_pad_token_id=script_args.label_pad_token_id,
         data_collator=data_collator,
         peft_config=lora_config,
-        loss_type=script_args.loss_type
+        loss_type=script_args.loss_type,
+        ref_model=ref_model,
     )
     if training_args.use_lora:
         dpo_trainer.add_callback(PeftSavingCallback())
