@@ -17,7 +17,8 @@ PROMPT_TEMPLATE='''Given a query, a passage and some supplementary information, 
 6. In the refined passage, when describing entities mentioned in the "Specific" supplementary information, add their associated bounding boxes in parentheses right after them, in the form of "entity([bbox])". If multiple entities of the same kind are mentioned, then seperate the box with ';', in the form of "entity([bbox1];[bbox2])"
 7. When deriving position relationships between entity instances, try to also use the bounding boxes information, which are represented as [x1, y1, x2, y2] with floating numbers ranging from 0 to 1. These values correspond to the top left x1, top left y1, bottom right x2, and bottom right y2. 
 8. When giving refined passage, also pay attention to the given query. The refined passage should be reasonable answers to the query.
-9. Note that instances of a certain category can also belong to its super-catergories. For example, a bus is also a car.
+9. Note that instances of a certain category can also belong to its super-catergories. For example, a bus is also a car. Different name of the same instance will be shown together. For example, we use (car 1, bus 2) to denote that car 1 and bus 2 are the same instance. You should also consider this information and refine the passage correctly.
+10. The specific information and the overall information may be conflict with the counting information. For example, the counting information says there is 1 car, but the specific information implies that there are 2 cars. In this case, the counting information is correct.
 
 Examples:
 Supplementary information:
@@ -50,15 +51,16 @@ Refined passage:
 
 Supplementary information:
 Counting: 
-There are 2 car.
+There are 3 car.
 car 1: [0.289, 0.637, 0.309, 0.661]
 car 2: [0.315, 0.633, 0.324, 0.662]
+(car 3, bus 1): [0.318, 0.092, 0.85, 0.963]
 
 There are 1 bus.
-bus 1: [0.318, 0.092, 0.85, 0.963]
+(car 3, bus 1): [0.318, 0.092, 0.85, 0.963]
 
 Specific:
-bus 1: [0.318, 0.092, 0.85, 0.963] The bus is red.
+(car 3, bus 1): [0.318, 0.092, 0.85, 0.963] The bus is red.
 
 
 Query:
@@ -97,10 +99,10 @@ Yes, there is a sports ball([0.682, 0.32, 0.748, 0.418]) in the image, and it ap
 Supplementary information:
 Counting: 
 There are 1 ball.
-ball 1: [0.682, 0.32, 0.748, 0.418]
+(ball 1, soccer ball 1): [0.682, 0.32, 0.748, 0.418]
 
 Specific:
-soccer ball 1: [0.682, 0.32, 0.748, 0.418] The soccer ball is in the image.
+(ball 1, soccer ball 1): [0.682, 0.32, 0.748, 0.418] The soccer ball is in the image.
 
 
 Query:
@@ -313,7 +315,7 @@ class Refiner:
     def generate_output(self, sample: Dict):
         all_claim = sample['claim']
         global_entity_dict = sample['entity_info']
-        
+        ent_aliases = sample['ent_aliases']
         # three parts: counting, specific, overall
         sup_info = ""
         # add counting info.
@@ -327,7 +329,13 @@ class Refiner:
                 cur_entity_claim_list = []
                 for idx, instance_claim_list in enumerate(instance_claim):
                     cur_inst_bbox = global_entity_dict[entity]['bbox'][idx]
-                    cur_entity_claim_list.append(f"{entity} {idx + 1}: {cur_inst_bbox} " + ' '.join(instance_claim_list))
+                    ent_name = f"{entity} {idx + 1}"
+                    ent_alias = ', '.join(sorted(ent_aliases[ent_name]))
+                    if len(ent_aliases[ent_name]) == 1:
+                        final_name = ent_alias
+                    else:
+                        final_name = f"({ent_alias})"
+                    cur_entity_claim_list.append(f"{final_name}: {cur_inst_bbox} " + ' '.join(instance_claim_list))
                 specific_claim_list.append('\n'.join(cur_entity_claim_list))
             sup_info += '\n\n'.join(specific_claim_list)
             sup_info += '\n\n'

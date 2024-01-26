@@ -2,15 +2,22 @@ import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="6"
 from typing import Dict
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from models.utils import compute_iou
+import torch
 
 def format_inputs(question: str, answer: str):
     return f"{answer} \\n {question}"
 
 def get_claim(tokenizer, model, question, answer):
-    input_text = format_inputs(question, answer)
+    if isinstance(question, str):
+        question = [question]
+    if isinstance(answer, str):
+        answer = [answer]
+    assert len(question) == len(answer)
+    input_text = [format_inputs(q, a) for q, a in zip(question, answer)]
     input_ids = tokenizer(input_text, return_tensors="pt", padding='longest', truncation=True, max_length=512).input_ids.to(model.device)
-    
-    generated_ids = model.generate(input_ids, max_length=64, num_beams=4, early_stopping=True)
+    with torch.inference_mode():
+        generated_ids = model.generate(input_ids, max_length=64, num_beams=4, early_stopping=True)
     ans = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
     return ans
 
@@ -57,22 +64,44 @@ class ClaimGenerator:
             for entity, answer_list in answer_dict.items():
                 if entity == 'overall':
                     all_claim.setdefault('overall', [])
+                    questions = []
+                    answers = []
                     for qa_tuple in answer_list:
                         qs, ans = qa_tuple
-                        clm = get_claim(self.tokenizer, self.model, qs, ans)
-                        all_claim['overall'] += clm
+                        questions.append(qs)
+                        answers.append(ans)
+                    clm = get_claim(self.tokenizer, self.model, questions, answers)
+                    all_claim['overall'] += clm
                 else:
                     all_claim.setdefault('specific', {}).setdefault(entity, [])
                     for idx, entity_answer_list in enumerate(answer_list):
                         if idx + 1 > len(all_claim['specific'][entity]):
                             all_claim['specific'][entity].append([])
+                        questions = []
+                        answers = []
                         for qa_tuple in entity_answer_list:
                             qs, ans = qa_tuple
-                            clm = get_claim(self.tokenizer, self.model, qs, ans)
-                            all_claim['specific'][entity][idx] += clm
+                            questions.append(qs)
+                            answers.append(ans)
+                        clm = get_claim(self.tokenizer, self.model, questions, answers)
+                        all_claim['specific'][entity][idx] += clm
                            
         # second part, counting info
         counting_claim = "Counting: \n"
+        ent_bboxes = {}
+        for entity, ent_info in sample['entity_info'].items():
+            for idx, bbox in enumerate(ent_info['bbox']):
+                ent_bboxes[f"{entity} {idx+1}"] = bbox
+        
+        IOU_THRESHOLD = 0.95
+        ent_aliases = {}
+        for s_ent,s_bbox in ent_bboxes.items():
+            ent_aliases.setdefault(s_ent, [])
+            for t_ent,t_bbox in ent_bboxes.items():
+                if compute_iou(s_bbox, t_bbox) > IOU_THRESHOLD:
+                    ent_aliases[s_ent].append(t_ent)
+
+
         for entity, ent_info in sample['entity_info'].items():
             counting_claim_list = []
             ent_counts = ent_info['total_count']
@@ -83,9 +112,16 @@ class ClaimGenerator:
                 counting_claim += f"There are {ent_counts} {entity}.\n"
                 box_claim_list = []
                 for idx, bbox in enumerate(ent_info['bbox']):
-                    box_claim_list.append(f"{entity} {idx+1}: {bbox}")
+                    ent_name = f"{entity} {idx+1}"
+                    ent_alias = ', '.join(sorted(ent_aliases[ent_name]))
+                    if len(ent_aliases[ent_name]) == 1:
+                        final_name = ent_alias
+                    else:
+                        final_name = f"({ent_alias})"
+                    box_claim_list.append(f"{final_name}: {bbox}")
                 counting_claim += '\n'.join(box_claim_list) + '\n\n'
                 
         all_claim['counting'] = counting_claim
-        sample['claim'] = all_claim     
+        sample['claim'] = all_claim
+        sample['ent_aliases'] = ent_aliases
         return sample

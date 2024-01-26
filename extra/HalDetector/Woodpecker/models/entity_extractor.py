@@ -7,7 +7,7 @@ NUM_SECONDS_TO_SLEEP = 0.5
 PROMPT_TEMPLATE='''Given a sentence, extract the entities within the sentence for me. 
 Extract the common objects and summarize them as general categories without repetition, merge essentially similar objects.
 Avoid extracting abstract or non-specific entities, such as lines, paintings, and so on. Make sure the entities can be detected by an object detection model.
-Extract entity in the singular form. Output all the extracted types of items in one line and separate each object type with a period. If there is nothing to output, then output a single "None".
+Extract entity in the singular form. Output all the extracted types of items in one line and separate each object type with a period. If there is nothing to output, then output a single "None". Notice again that the output should be in the singular form.
 
 Examples:
 Sentence:
@@ -29,7 +29,7 @@ Output:
 car
 
 Sentence:
-The image depicts a group of animals, with a black dog, a white kitten, and a gray cat, sitting on a bed.
+The image depicts a group of animals, with a black dog, a white kitten, and gray cats, sitting on a bed.
 
 Output:
 dog.cat.bed

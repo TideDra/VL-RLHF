@@ -12,7 +12,7 @@ from GPTFactory import GPT
 class Corrector:
     def __init__(self, api_key=None,end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None) -> None:
         # init all the model
-        self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point)
+        self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point,temperature=0.7)
         self.preprocessor = PreProcessor(self.chatbot)
         self.entity_extractor = EntityExtractor(self.chatbot)
         self.detector = Detector(detector_config,detector_model_path,cache_dir)
@@ -40,10 +40,8 @@ class Corrector:
         sample = self.questioner.generate_questions(sample)
         print("start generating answers...")
         sample = self.answerer.generate_answers(sample)
-        print(sample['generated_answers'])
         print("start generating claims...")
         sample = self.claim_generator.generate_claim(sample)
-        print(sample['claim'])
         print("start refining...")
         sample = self.refiner.generate_output(sample)
         
