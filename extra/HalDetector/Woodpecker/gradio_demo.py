@@ -1,178 +1,83 @@
-import argparse
-import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1"
-import torch
-from transformers import AutoTokenizer
-from vis_corrector import Corrector
-from models.utils import extract_boxes, find_matching_boxes, annotate
-import sys
-sys.path.append('path/to/mPLUG-Owl')
-from mplug_owl.modeling_mplug_owl import MplugOwlForConditionalGeneration
-from mplug_owl.processing_mplug_owl import MplugOwlImageProcessor, MplugOwlProcessor
-
-from PIL import Image
-from types import SimpleNamespace
-import numpy as np
-import cv2
+from  multiprocessing import Process,Queue,set_start_method
 import gradio as gr
-import uuid
+import sys
+sys.path.append('/mnt/gozhang/code/VL-RLHF/')
+import os
+from copy import deepcopy
+from vis_corrector import Corrector
 
-
-
-# ========================================
-#             Model Initialization
-# ========================================
-PROMPT_TEMPLATE = '''The following is a conversation between a curious human and AI assistant. The assistant gives helpful, detailed, and polite answers to the user's questions.
-Human: <image>
-Human: {question}
-AI: '''
-
-print('Initializing Chat')
-
-# initialize corrector
-args_dict = {
-        'api_key': "sk-xxxxxxxxxxxxxxxx",
-        'api_base': "https://api.openai.com/v1",
-        'val_model_path': "Salesforce/blip2-flan-t5-xxl",
-        'qa2c_model_path': "khhuang/zerofec-qa2claim-t5-base",
-        'detector_config':"path/to/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-        'detector_model_path':"path/to/GroundingDINO/weights/groundingdino_swint_ogc.pth",
-        'cache_dir': './cache_dir',
+args = {
+    'api_key': "7a9bc8c30afc4ddebee73f30f032dee8",
+    'end_point':"https://testdeploy3.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-07-01-preview",
+    'val_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/Qwen-VL-Chat",
+    'qa2c_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/zerofec-qa2claim-t5-base",
+    'detector_config': "../../GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
+    'detector_model_path': "../../GroundingDINO/weights/groundingdino_swint_ogc.pth",
+    'cache_dir': "./cache_dir/",
+    'api_service': "azure"
 }
 
-model_args = SimpleNamespace(**args_dict)
-corrector = Corrector(model_args)
+def worker(device,corrector_args,job_queue,result_queue):
+    os.environ["CUDA_VISIBLE_DEVICES"] = device
+    new_arg = deepcopy(corrector_args)
+    new_arg['cache_dir'] = f"./cache_dir/{device}/"
+    corrector = Corrector(**corrector_args)
 
-# initialize mplug-Owl
-pretrained_ckpt = "MAGAer13/mplug-owl-llama-7b"
-model = MplugOwlForConditionalGeneration.from_pretrained(
-    pretrained_ckpt,
-    torch_dtype=torch.bfloat16,
-).to("cuda:1")
-image_processor = MplugOwlImageProcessor.from_pretrained(pretrained_ckpt)
-tokenizer = AutoTokenizer.from_pretrained(pretrained_ckpt)
-processor = MplugOwlProcessor(image_processor, tokenizer)
+    while True:
+        sample = job_queue.get()
+        result = corrector.correct(sample)
+        result_queue.put(result)
 
-print('Initialization Finished')
-
-@torch.no_grad()
-def my_model_function(image, question, box_threshold, area_threshold):
-    # create a temp dir to save uploaded imgs
-    temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    
-    unique_filename = str(uuid.uuid4()) + ".png"
-    
-    temp_file_path = os.path.join(temp_dir, unique_filename)
-    
-    success = cv2.imwrite(temp_file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-    
-    try:
-        output_text, output_image = model_predict(temp_file_path, question, box_threshold, area_threshold) # 你的模型预测函数
-    finally:
-        # remove temporary files.
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-    
-    return output_text, output_image
-
-def get_owl_output(img_path, question):
-    prompts = [PROMPT_TEMPLATE.format(question=question)]
-    image_list = [img_path]
-
-    # get response
-    generate_kwargs = {
-        'do_sample': False,
-        'top_k': 5,
-        'max_length': 512
+def inference(img,text,query):
+    sample = {
+    'img_path': img,
+    'input_desc': text,
+    'query': query
     }
-    images = [Image.open(_) for _ in image_list]
-    inputs = processor(text=prompts, images=images, return_tensors='pt')
-    inputs = {k: v.bfloat16() if v.dtype == torch.float else v for k, v in inputs.items()}
-    inputs = {k: v.to(model.device) for k, v in inputs.items()}
-    with torch.no_grad():
-        res = model.generate(**inputs, **generate_kwargs)
-    sentence = tokenizer.decode(res.tolist()[0], skip_special_tokens=True)
-    return sentence
+    job_q.put(sample)
+    result = result_q.get()
+    rest_text = result['output']
+    split_text = []
+    while len(rest_text)>0:
+        f_start = rest_text.find('<f>')
+        if f_start == -1:
+            split_text.append((rest_text,None))
+            break
+        split_text.append((rest_text[:f_start],None))
+        f_end = rest_text.find('</f>')
+        split_text.append((rest_text[f_start:f_end+4],"False"))
+        rest_text = rest_text[f_end+4:]
+        t_start = rest_text.find('<t>')
+        t_end = rest_text.find('</t>')
+        split_text.append((rest_text[t_start:t_end+4],"True"))
+        rest_text = rest_text[t_end+4:]
+    return split_text
 
-def model_predict(image_path, question, box_threshold, area_threshold):
-    
-    temp_output_filepath = os.path.join("temp", str(uuid.uuid4()) + ".png")
-    os.makedirs("temp", exist_ok=True)
+if __name__ == "__main__":
     try:
-        owl_output = get_owl_output(image_path, question)
-        corrector_sample = {
-            'img_path': image_path,
-            'input_desc': owl_output,
-            'query': question,
-            'box_threshold': box_threshold,
-            'area_threshold': area_threshold
-        }
-        corrector_sample = corrector.correct(corrector_sample)
-        corrector_output = corrector_sample['output']
-        
-        extracted_boxes = extract_boxes(corrector_output)
-        boxes, phrases = find_matching_boxes(extracted_boxes, corrector_sample['entity_info'])
-        output_image = annotate(image_path, boxes, phrases)
-        cv2.imwrite(temp_output_filepath, output_image)
-        output_image_pil = Image.open(temp_output_filepath)
-        output_text = f"mPLUG-Owl:\n{owl_output}\n\nCorrector:\n{corrector_output}"
+        set_start_method('spawn')
+    except:
+        pass
+    job_q = Queue()
+    result_q = Queue()
+    
+    pool_list = []
+    for i in range(4):
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(i)
+        p = Process(target=worker,args=(str(i),args,job_q,result_q))
+        pool_list.append(p)
+        p.start()
 
-        return output_text, output_image_pil
-    finally:
-        if os.path.exists(temp_output_filepath):
-            os.remove(temp_output_filepath)
-
-def create_multi_modal_demo():
-    with gr.Blocks() as instruct_demo:
+    with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
-                img = gr.Image(label='Upload Image')
-                question = gr.Textbox(lines=2, label="Prompt")
-                
-                with gr.Accordion(label='Detector parameters', open=True):
-                    box_threshold = gr.Slider(minimum=0, maximum=1,
-                                     value=0.35, label="Box threshold")
-                    area_threshold = gr.Slider(minimum=0, maximum=1,
-                                     value=0.02, label="Area threshold")
-
-                run_botton = gr.Button("Run")
-
+                img = gr.Image(type="filepath",label="Image")
+                query = gr.Textbox(lines=3,value="Describe this picture in detail.",label="Query")
+                text = gr.Textbox(label="Answer")
+                btn = gr.Button(value="Submit")
             with gr.Column():
-                output_text = gr.Textbox(lines=10, label="Output")
-                output_img = gr.Image(label="Output Image", type='pil')
-                
-        inputs = [img, question, box_threshold, area_threshold]
-        outputs = [output_text, output_img]
+                output = gr.HighlightedText(label="Output",show_legend=True,combine_adjacent=True,color_map={"True":"green","False":"red"})
+        btn.click(inference,inputs=[img,text,query],outputs=output)
+    demo.launch(share=True,max_threads=4)
+
         
-        examples = [
-            ["./examples/case1.jpg", "How many people in the image?"],
-            ["./examples/case2.jpg", "Is there any car in the image?"],
-            ["./examples/case3.jpg", "Describe this image."],
-        ]
-
-        gr.Examples(
-            examples=examples,
-            inputs=inputs,
-            outputs=outputs,
-            fn=my_model_function,
-            cache_examples=False,
-            run_on_click=True
-        )
-        run_botton.click(fn=my_model_function,
-                         inputs=inputs, outputs=outputs)
-    return instruct_demo
-
-description = """
-# Woodpecker: Hallucination Correction for MLLMs🔧
-**Note**: Due to network restrictions, it is recommended that the size of the uploaded image be less than **1M**.
-
-Please refer to our [github](https://github.com/BradyFU/Woodpecker) for more details.
-"""
-
-with gr.Blocks(css="h1,p {text-align: center;}") as demo:
-    gr.Markdown(description)
-    with gr.TabItem("Multi-Modal Interaction"):
-        create_multi_modal_demo()
-
-demo.queue(api_open=False).launch(share=True)

@@ -10,7 +10,7 @@ PROMPT_TEMPLATE='''Given a query, a passage and some supplementary information, 
     "Counting" information that specifies how many instances of a certain kind of entity exist, and their associated bounding boxes;
     "Specific" information that describes attribute information specific to each entity instance, including bounding boxes, colors, etc. The information is arranged in the form of "entity 1: [bbox] "info of this entity". Note that the entity in "Specific" information corresponds to that in the "Counting" information.
     "Overall" information that may involve information about multiple entity objects. 
-2. Mark the words in the passage with <f> and </f> tag if they are inconsistent with the supplementary information, and then append the corrected words marked with <t> and </t> tag after the wrong words.
+2. Mark the words in the passage with <f> and </f> tag if they are inconsistent with the supplementary information, and then append the corrected words marked with <t> and </t> tag after the wrong words. The corrected words must be the same topic as the original wrong words, which means you cannot just replace the wrong words with an arbitrary fact that provides different information from the original words.
 3. The structure of the corrected sentence should be consistent with the original sentence as possible. Try to correct as few words as possible, but make sure the sentence is fluent, natural and complete after correction, also considering the punctuation.
 4. The number of entitie instances should match the number in the 'Counting' information. Also correct the number counts if the number stated in the original sentence does not match the counting information.
 5. If the passage mentions entity or attribute that does not exist in the supplementary information, then mark the words and remove it, where 'remove' means the corrected words should be empty, or a simple '<t></t>' tag in other words. If the removed words contain some entities that truly exist, you should rewrite the sentence and contain the entities, instead of leaving an empty sentence. Note that the corrected sentence should be fluent, natural and complete after removal. So you should choose the words to remove carefully, also considering the punctuation.
@@ -18,7 +18,9 @@ PROMPT_TEMPLATE='''Given a query, a passage and some supplementary information, 
 7. When deriving position relationships between entity instances, try to also use the bounding boxes information, which are represented as [x1, y1, x2, y2] with floating numbers ranging from 0 to 1. These values correspond to the top left x1, top left y1, bottom right x2, and bottom right y2. 
 8. When giving refined passage, also pay attention to the given query. The refined passage should be reasonable answers to the query.
 9. Note that instances of a certain category can also belong to its super-catergories. For example, a bus is also a car. Different name of the same instance will be shown together. For example, we use (car 1, bus 2) to denote that car 1 and bus 2 are the same instance. You should also consider this information and refine the passage correctly.
-10. The specific information and the overall information may be conflict with the counting information. For example, the counting information says there is 1 car, but the specific information implies that there are 2 cars. In this case, the counting information is correct.
+10. The specific information and the overall information may be conflict with the counting information. For example, the counting information says there is 1 car, but the specific information implies that there are 2 cars. In this case, you should ignore the specific information and trust the counting information.
+11. You should only correct the given passage, do not add any extra sentences.
+
 
 Examples:
 Supplementary information:

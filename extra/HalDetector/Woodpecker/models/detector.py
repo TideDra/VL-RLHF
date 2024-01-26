@@ -90,9 +90,10 @@ class Detector:
                         Note: if total_count > 1, may use the whole image in the following steps.
                 }
     '''
-    def __init__(self, detector_config,detector_model_path, cache_dir):
+    def __init__(self, detector_config,detector_model_path, cache_dir,device='cuda'):
         
-        self.model = load_model(detector_config, detector_model_path, device='cuda:0')
+        self.device = device
+        self.model = load_model(detector_config, detector_model_path, device='cuda')
         self.cache_dir = cache_dir
         self.nlp = spacy.load("en_core_web_md")
         
@@ -121,7 +122,7 @@ class Detector:
                 caption=entity_str,
                 box_threshold=sample['box_threshold'] if 'box_threshold' in sample else BOX_TRESHOLD,
                 text_threshold=TEXT_TRESHOLD,
-                device='cuda:0'
+                device=self.device
             )
             phrases = find_most_similar_strings(self.nlp, phrases, entity_list)    
             global_entity_dict = extract_detection(global_entity_dict, boxes, phrases, image_source, self.cache_dir, sample)

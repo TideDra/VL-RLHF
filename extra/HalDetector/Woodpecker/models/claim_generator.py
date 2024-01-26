@@ -50,8 +50,9 @@ class ClaimGenerator:
                             }
     '''
     
-    def __init__(self, qa2c_model_path):
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(qa2c_model_path).to('cuda:0')
+    def __init__(self, qa2c_model_path,device='cuda'):
+        self.device=device
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(qa2c_model_path).to(device)
         self.tokenizer = AutoTokenizer.from_pretrained(qa2c_model_path)
 
     def generate_claim(self, sample: Dict):
@@ -105,7 +106,7 @@ class ClaimGenerator:
         for entity, ent_info in sample['entity_info'].items():
             counting_claim_list = []
             ent_counts = ent_info['total_count']
-            if ent_counts == 0:
+            if ent_counts == 0 and entity != "":
                 counting_claim += f"There is no {entity}.\n\n"
                 continue
             else:

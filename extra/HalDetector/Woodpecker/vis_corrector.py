@@ -8,19 +8,20 @@ from models.refiner import Refiner
 from tqdm import tqdm
 from typing import List, Dict
 import time
+import shutil
 from GPTFactory import GPT
 class Corrector:
-    def __init__(self, api_key=None,end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None) -> None:
+    def __init__(self, api_key=None,end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None,device='cuda') -> None:
         # init all the model
         self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point,temperature=0.7)
         self.preprocessor = PreProcessor(self.chatbot)
         self.entity_extractor = EntityExtractor(self.chatbot)
-        self.detector = Detector(detector_config,detector_model_path,cache_dir)
+        self.detector = Detector(detector_config,detector_model_path,cache_dir,device=device)
         self.questioner = Questioner(self.chatbot)
-        self.answerer = Answerer(val_model_path)
-        self.claim_generator = ClaimGenerator(qa2c_model_path)
+        self.answerer = Answerer(val_model_path,device=device)
+        self.claim_generator = ClaimGenerator(qa2c_model_path,device=device)
         self.refiner = Refiner(self.chatbot)
-        
+        self.cache_dir = cache_dir
         print("Finish loading models.")
 
     
@@ -44,7 +45,7 @@ class Corrector:
         sample = self.claim_generator.generate_claim(sample)
         print("start refining...")
         sample = self.refiner.generate_output(sample)
-        
+        shutil.rmtree(self.cache_dir)
         return sample
 
     def batch_correct(self, samples: List[Dict]):
