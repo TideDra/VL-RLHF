@@ -16,6 +16,7 @@ It is no need to cover all the specified entities. If there is no question to as
 When asking questions, do not assume the claims in the description as true in advance. Only ask questions relevant to the information in the sentence.
 Only ask questions about common, specific and concrete entities. The entities involved in the questions are limited to the range within the given entities.
 Output only one question in each line. For each line, first output the question, then a single '&', and finally entities involved in the question, still connected by periods if multiple entities are involved. 
+If the question only involves one entity, you should use the word 'this' to refer the entity, like "this person", "this dog".
 
 Examples:
 Sentence:
@@ -25,8 +26,8 @@ Entities:
 dog.cat
 
 Questions:
-What color is the cat?&cat
-What color is the dog?&dog
+What color is this cat?&cat
+What color is this dog?&dog
 
 Sentence:
 The man is wearing a baseball cap and appears to be smoking.
@@ -35,8 +36,8 @@ Entities:
 man
 
 Questions:
-What is the man wearing?&man
-What is the man doing?&man
+What is this man wearing?&man
+What is this man doing?&man
 
 Sentence:
 The image depicts a busy kitchen, with a man in a white apron. The man is standing in the middle of the kitchen.
@@ -45,8 +46,28 @@ Entities:
 kitchen.man
 
 Questions:
-What does the man wear?&man
+What does this man wear?&man
 Is the man standing in the middle of the kitchen?&man.kitchen
+
+Sentence:
+There is a person partially visible in the background.
+
+Entities:
+person
+
+Questions:
+Is this person partially visible in the background?&person
+
+Sentence:
+The woman and the man next to her are both laughing.
+
+Entities:
+woman.man
+
+Questions:
+Is this woman laughing?&woman
+Is this man laughing?&man
+Is the man stand next to the woman?&woman.man
 
 Sentence:
 {sent}

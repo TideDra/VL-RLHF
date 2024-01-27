@@ -50,7 +50,7 @@ class EntityExtractor:
         extracted_entities = []
         for sent in sample['split_sents']:
             entity_str = self.get_res(sent)
-            extracted_entities.append(entity_str)
+            extracted_entities.append(entity_str.strip('.'))
         sample['named_entity'] = extracted_entities
         
         return sample
