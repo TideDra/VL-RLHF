@@ -106,6 +106,6 @@ if __name__ == "__main__":
                 with gr.Accordion(label="Intermediate Detail"):
                     intermediate_detail = gr.JSON()
         btn.click(inference,inputs=[img,text,query,refiner_sys_message]+refiner_examples_el,outputs=[output,intermediate_detail])
-    demo.launch(share=True,max_threads=4)
+    demo.launch(share=False,max_threads=4)
 
         

@@ -7,7 +7,7 @@ import spacy
 # Do not ask questions related to position or position relationship.
 NUM_SECONDS_TO_SLEEP = 0.5
 PROMPT_TEMPLATE='''Given a sentence and some entities connnected by periods, you are required to ask some relevant questions about the specified entities involved in the sentence, so that the questions can help to verify the factuality of the sentence.
-Questions may involve basic attributes such as colors, actions mentioned in the sentence. Do not ask questions involving object counts or the existence of object.
+Questions may involve basic attributes such as colors, actions mentioned in the sentence. Do not ask questions involving object counts or the existence of object. For example, do not ask questions like "How many dogs are there in the image?" or "Is there a dog in the image?".
 When asking questions about attributes, try to ask simple questions that only involve one entity. 
 Ask questions that can be easily decided visually. Do not ask questions that require complex reasoning.
 Do not ask semantically similar questions. Do not ask questions only about scenes or places.
@@ -17,7 +17,7 @@ When asking questions, do not assume the claims in the description as true in ad
 Only ask questions about common, specific and concrete entities. The entities involved in the questions are limited to the range within the given entities.
 Output only one question in each line. For each line, first output the question, then a single '&', and finally entities involved in the question, still connected by periods if multiple entities are involved. 
 If the question only involves one entity, you should use the word 'this' to refer the entity, like "this person", "this dog".
-
+Again, Do not ask "How many" or "Is there" questions.
 Examples:
 Sentence:
 There are one black dog and two white cats in the image.
@@ -68,6 +68,16 @@ Questions:
 Is this woman laughing?&woman
 Is this man laughing?&man
 Is the man stand next to the woman?&woman.man
+
+Sentence:
+There are several other people in the background of the photo, some of whom are more focused on the man and woman, while others appear to be engaged in party activities.
+
+Entities:
+person.man.woman
+
+Questions:
+Is this person in the background of the photo?&person
+Are some of the people in the background focused on the man and woman?&person.man.woman
 
 Sentence:
 {sent}

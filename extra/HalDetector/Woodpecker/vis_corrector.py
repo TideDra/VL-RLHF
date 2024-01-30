@@ -10,6 +10,8 @@ from typing import List, Dict
 import time
 import shutil
 from GPTFactory import GPT
+import torch
+import gc
 class Corrector:
     def __init__(self, api_key=None,end_point=None,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_path=None,qa2c_model_path=None,device='cuda') -> None:
         # init all the model
@@ -51,6 +53,8 @@ class Corrector:
         sample = self.refiner.generate_output(sample)
         print('done')
         shutil.rmtree(self.cache_dir)
+        torch.cuda.empty_cache()
+        gc.collect()
         return sample
 
     def batch_correct(self, samples: List[Dict]):
