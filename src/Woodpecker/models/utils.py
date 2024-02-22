@@ -4,7 +4,12 @@ import numpy as np
 from typing import List
 import re
 from PIL import Image
+from sglang import function,  user, assistant, gen, image
 
+@function
+def image_qa(s, image_path, question):
+    s += user(image(image_path) + question)
+    s += assistant(gen("answer"))
 def compute_iou(box1, box2):
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])

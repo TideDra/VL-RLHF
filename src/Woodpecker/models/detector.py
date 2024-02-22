@@ -10,12 +10,8 @@ from torchvision.ops import box_convert
 import torch
 from .utils import compute_iou
 from groundingdino.util.inference import load_model, load_image, predict
-from PIL import Image
+from PIL import Image, ImageDraw
 import spacy
-
-
-
-
 
 BOX_TRESHOLD = 0.35     # used in detector api.
 TEXT_TRESHOLD = 0.25    # used in detector api.
@@ -50,9 +46,11 @@ def extract_detection(global_entity_dict, boxes, phrases, image_source, cache_di
        
         # add instance, including the cropped_pic & its original bbox
         crop_id = shortuuid.uuid()
-        crop_img = Image.fromarray(image_source).crop(box)
+        image = Image.fromarray(image_source)
+        draw = ImageDraw.Draw(image)
+        draw.rectangle(box, outline="red", width=4)
         crop_path = os.path.join(cache_dir, f"{crop_id}.png")
-        crop_img.save(crop_path)
+        image.save(crop_path)
         
         global_entity_dict[entity]['total_count'] += 1
         global_entity_dict[entity]['crop_path'].append(crop_path)

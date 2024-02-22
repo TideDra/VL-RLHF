@@ -13,7 +13,7 @@ args = {
     'end_point':"https://testdeploy3.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-07-01-preview",
     'refiner_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
     'refiner_end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview",
-    'val_model_path': "/mnt/gozhang/ckpts/Qwen-VL-Chat",
+    'val_model_endpoint': "http://localhost:30000",
     'qa2c_model_path': "/mnt/gozhang/ckpts/zerofec-qa2claim-t5-base",
     'detector_config': "./GroundingDINO_SwinT_OGC.py",
     'detector_model_path': "/mnt/gozhang/ckpts/groundingdino_swint_ogc.pth",
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     result_q = Queue()
     
     pool_list = []
-    gpu_num = 2
+    gpu_num = 4
     for i in range(gpu_num):
         os.environ["CUDA_VISIBLE_DEVICES"] = str(i)
         p = Process(target=worker,args=(str(i),args,job_q,result_q))
