@@ -13,10 +13,10 @@ args = {
     'end_point':"https://testdeploy3.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-07-01-preview",
     'refiner_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
     'refiner_end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview",
-    'val_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/Qwen-VL-Chat",
-    'qa2c_model_path': "/mnt/gozhang/code/VL-RLHF/ckpts/zerofec-qa2claim-t5-base",
-    'detector_config': "../../GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-    'detector_model_path': "../../GroundingDINO/weights/groundingdino_swint_ogc.pth",
+    'val_model_path': "/mnt/gozhang/ckpts/Qwen-VL-Chat",
+    'qa2c_model_path': "/mnt/gozhang/ckpts/zerofec-qa2claim-t5-base",
+    'detector_config': "./GroundingDINO_SwinT_OGC.py",
+    'detector_model_path': "/mnt/gozhang/ckpts/groundingdino_swint_ogc.pth",
     'cache_dir': "./cache_dir/",
     'api_service': "azure"
 }
@@ -106,6 +106,6 @@ if __name__ == "__main__":
                 with gr.Accordion(label="Intermediate Detail"):
                     intermediate_detail = gr.JSON()
         btn.click(inference,inputs=[img,text,query,refiner_sys_message]+refiner_examples_el,outputs=[output,intermediate_detail])
-    demo.launch(share=False,max_threads=4)
+    demo.launch(share=True,max_threads=4)
 
         

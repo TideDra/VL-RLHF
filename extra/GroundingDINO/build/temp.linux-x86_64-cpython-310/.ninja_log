@@ -1,5 +1,0 @@
-# ninja log v5
-1	642	1705655284851229054	/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/build/temp.linux-x86_64-cpython-310/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.o	165f6c0b5df62e5a
-0	4529	1705655288731285367	/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/build/temp.linux-x86_64-cpython-310/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.o	ef7de80384b94754
-1	15479	1705655299683445149	/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/build/temp.linux-x86_64-cpython-310/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.o	15ca76bbe70116f3
-1	19622	1705655303823505606	/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/build/temp.linux-x86_64-cpython-310/mnt/gozhang/code/VL-RLHF/extra/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.o	9debd5971bbce6e
