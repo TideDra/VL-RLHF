@@ -19,7 +19,7 @@ Answer: Yes, there is a person sitting on the couch in the image.''')
 Answer: No, the woman holding the drink in the red bounding box is far away from the camera.''')
     s += assistant("Summary: The woman holding the drink is far away from the camera.")
     s += user(f"Question: {question}\nAnswer: {answer}")
-    s += assistant(gen('claim'))
+    s += assistant("Summary: "+gen('claim'))
 
 def get_claim(question, answer):
     if isinstance(question, str):
@@ -28,7 +28,7 @@ def get_claim(question, answer):
         answer = [answer]
     assert len(question) == len(answer)
     states = claimer.run_batch([{ 'question': q, 'answer': a} for q, a in zip(question, answer)],temperature=0,max_new_tokens=256)
-    return [s['claim'].replace("Summary: ",'') for s in states]
+    return [s['claim'] for s in states]
 
 class ClaimGenerator:
     '''
