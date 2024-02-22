@@ -1,6 +1,6 @@
 export PYTHONPATH=$PYTHONPATH:$PWD
 mkdir -p ./eval/captioning/results
-python eval/captioning/generate.py \
+python -m vlrlhf.eval.captioning.generate \
     --data_root ./data_dir/coco2017/test2017 \
     --processor_path ckpts/Qwen-VL-Chat \
     --model_path $CKPT \

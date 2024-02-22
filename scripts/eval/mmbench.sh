@@ -1,6 +1,6 @@
 export PYTHONPATH=$PYTHONPATH:$PWD
 mkdir -p ./eval/mmbench/results/${TAG}
-python eval/mmbench/eval.py \
+python -m vlrlhf.eval.mmbench.eval \
     --data_root ./data_dir/mmbench_dev_en_20231003.tsv \
     --processor_path ckpts/Qwen-VL-Chat \
     --model_path $CKPT \

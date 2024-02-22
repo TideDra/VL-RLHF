@@ -1,6 +1,6 @@
 export PYTHONPATH=$PYTHONPATH:$PWD
 mkdir -p ./eval/mmvet/results
-python ./eval/mmvet/eval.py \
+python -m vlrlhf.eval.mmvet.eval \
     --data_root ./data_dir/mm-vet \
     --model_path $CKPT \
     --output_path ./eval/mmvet/results/${TAG}.json \
