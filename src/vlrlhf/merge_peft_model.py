@@ -1,4 +1,4 @@
-from utils.auto_load import MyAutoModel
+from .utils.auto_load import MyAutoModel
 from peft import PeftModel
 from argparse import ArgumentParser
 import os

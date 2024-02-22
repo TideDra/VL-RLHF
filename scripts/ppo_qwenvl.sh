@@ -14,7 +14,7 @@ vinit=0.1
 name="bs_${global_bs}_bbs_${global_backward_bs}_ppoep_${ppo_epochs}_lr_${lr}_fixkl_${init_kl_coef}_vfcoef_${vf_coef}_vinit_${vinit}_vlfeedback60k_rm20k_mg-1"
 export WANDB_MODE="online"
 accelerate launch --config_file accelerate_config/ddp.yaml --num_processes $gpu_number\
-        ppo.py \
+        src/vlrlhf/ppo.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
         --output_dir ckpts/Qwen-VL-Chat-ppo/$name \
         --data_dir data_dir/VLQueryData/vlfeedback_60k.json \

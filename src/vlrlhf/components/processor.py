@@ -5,7 +5,7 @@ from typing import List, Dict, Union, Literal, Optional
 import re
 from loguru import logger
 from PIL.Image import Image
-from utils.common import pad_to_length
+from ..utils.common import pad_to_length
 import torch
 from transformers.tokenization_utils_base import BatchEncoding
 from transformers import PreTrainedTokenizerBase

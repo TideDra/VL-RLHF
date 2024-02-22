@@ -4,8 +4,7 @@ import torch
 from PIL import Image
 from transformers import Blip2Processor, Blip2ForConditionalGeneration
 from typing import Dict
-from utils.auto_load import MyAutoModel,MyAutoProcessor, MyAutoGenerationConfig
-
+from vlrlhf.utils.auto_load import MyAutoModel,MyAutoProcessor, MyAutoGenerationConfig
 
 def get_answer_or_prepare(processor, model, raw_img_path,img_path, qs,batch):
     if batch.get((raw_img_path,img_path,qs), None) is None:

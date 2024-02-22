@@ -9,3 +9,4 @@ ckpts
 *.ttf
 .vscode
 *.pth
+*.egg-info

@@ -3,7 +3,7 @@ import spacy
 import openai
 import time
 from tqdm import tqdm
-
+import os
 NUM_SECONDS_TO_SLEEP = 0.5
 
 PROMPT_TEMPLATE='''Given a passage, you are required to replace pronouns such as "they" with the actual entities they refer to based on the context, then output the passage after replacement.
@@ -35,7 +35,13 @@ class PreProcessor:
     
     def __init__(self, chatbot):
         self.chatbot = chatbot
-        self.nlp = spacy.load('en_core_web_lg')
+        try:
+            self.nlp = spacy.load('en_core_web_lg')
+        except:
+            os.system("python -m spacy download en_core_web_lg")
+            os.system("python -m spacy download en_core_web_md")
+            os.system("python -m spacy download en_core_web_sm")
+            self.nlp = spacy.load('en_core_web_lg')
 
     def get_split_sents(self, passage):
         doc = self.nlp(passage)

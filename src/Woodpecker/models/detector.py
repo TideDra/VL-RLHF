@@ -8,7 +8,7 @@ from collections import defaultdict
 import shortuuid
 from torchvision.ops import box_convert
 import torch
-from models.utils import compute_iou
+from .utils import compute_iou
 from groundingdino.util.inference import load_model, load_image, predict
 from PIL import Image
 import spacy

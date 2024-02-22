@@ -7,7 +7,7 @@ global_bs=$((per_device_train_batch_size * gradient_accumulation_steps * gpu_num
 name="bs_${global_bs}_ep_${epoch}_lr_${lr}"
 
 accelerate launch --config_file accelerate_config/zero3.yaml --num_processes $gpu_number \
-        sft.py \
+        src/vlrlhf/sft.py \
         --model_name_or_path ckpts/Qwen-VL-Chat \
         --output_dir ckpts/Qwen-VL-Chat-dpo/$name \
         --data_dir data_dir/VLFeedback \

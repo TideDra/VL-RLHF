@@ -2,9 +2,9 @@ from typing import Optional, Union, Any, Callable, List
 from datasets import Dataset
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer as Optimizer
-from components.model import VLModelWithValueHead, VLRewardModel
+from .model import VLModelWithValueHead, VLRewardModel
 from trl import PPOTrainer, PPOConfig
-from components.processor import VLProcessor
+from .processor import VLProcessor
 from tqdm import tqdm
 from abc import ABC
 import torch

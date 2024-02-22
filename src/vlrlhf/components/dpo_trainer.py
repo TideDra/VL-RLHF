@@ -14,7 +14,7 @@ from trl import DPOTrainer
 import torch
 from .processor import VLProcessor
 from abc import ABC
-from utils.common import pad_to_length
+from ..utils.common import pad_to_length
 
 class VLDPOTrainer(DPOTrainer, ABC):
     def __init__(

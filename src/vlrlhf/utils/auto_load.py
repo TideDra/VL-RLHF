@@ -1,4 +1,4 @@
-from components.model import (
+from ..components.model import (
     LlavaForRL,
     LlavaRewardModel,
     QwenVLRewardModel,
@@ -13,7 +13,7 @@ from transformers import (
     DataCollator,
     PreTrainedModel,
 )
-from components.collator import (
+from ..components.collator import (
     LlavaDPODataCollatorWithPadding,
     QwenVLDPODataCollatorWithPadding,
     VLDPODataCollatorWithPadding,
@@ -27,11 +27,11 @@ from components.collator import (
     LlavaPPODataCollator,
     QwenVLPPODataCollator
 )
-from components.processor import LlavaProcessor, QwenVLProcessor, VLProcessor
-from components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer, VLDPOTrainer
-from components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer, VLSFTTrainer
-from components.rm_trainer import LlavaRMTrainer, QwenVLRMTrainer, VLRMTrainer
-from components.ppo_trainer import LlavaPPOTrainer, QwenVLPPOTrainer, VLPPOTrainer
+from ..components.processor import LlavaProcessor, QwenVLProcessor, VLProcessor
+from ..components.dpo_trainer import LlavaDPOTrainer, QwenVLDPOTrainer, VLDPOTrainer
+from ..components.sft_trainer import LlavaSFTTRainer, QwenVLSFTTrainer, VLSFTTrainer
+from ..components.rm_trainer import LlavaRMTrainer, QwenVLRMTrainer, VLRMTrainer
+from ..components.ppo_trainer import LlavaPPOTrainer, QwenVLPPOTrainer, VLPPOTrainer
 from typing import Optional, Any, Union
 from functools import wraps
 from trl import PPOConfig, RewardConfig

@@ -11,7 +11,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from components.processor import VLProcessor
+from .processor import VLProcessor
 from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalPrediction
 from transformers import Trainer

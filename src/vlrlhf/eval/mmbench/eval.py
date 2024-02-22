@@ -1,5 +1,5 @@
 from PIL import Image
-from utils.auto_load import MyAutoModel, MyAutoProcessor, MyAutoGenerationConfig
+from vlrlhf.utils.auto_load import MyAutoModel, MyAutoProcessor, MyAutoGenerationConfig
 from torch.utils.data import Dataset,DataLoader
 import torch
 from tqdm import tqdm

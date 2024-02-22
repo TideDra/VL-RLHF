@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 import torch
-from utils.data import make_vlfeedback_paired_dataset
+from .utils.data import make_vlfeedback_paired_dataset
 from transformers import HfArgumentParser, Trainer
 from peft import LoraConfig
 import transformers
 import os
-from utils.auto_load import MyAutoRMCollator, MyAutoProcessor, MyAutoRewardModel, MyAutoRMTrainer
-from utils.common import get_vision_tower, safe_save_model_for_hf_trainer
+from .utils.auto_load import MyAutoRMCollator, MyAutoProcessor, MyAutoRewardModel, MyAutoRMTrainer
+from .utils.common import get_vision_tower, safe_save_model_for_hf_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
 from transformers.trainer_callback import TrainerCallback

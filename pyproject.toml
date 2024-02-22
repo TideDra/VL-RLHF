@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vlrlhf"
+version = "0.0.1"
+dependencies = [
+    "numpy",
+    "loguru",
+    "torch",
+    "torchvision",
+    "transformers",
+    "peft",
+    "deepspeed",
+    "accelerate",
+    "trl == 0.7.11",
+    "einops",
+    "tiktoken",
+    "matplotlib",
+    "pillow",
+    "transformers_stream_generator",
+    "wandb",
+    "jsonlines",
+    "scikit-learn",
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Geary Zhang", email = "gearyzhang@outlook.com"},
+]
+maintainers = [
+  {name = "Geary Zhang", email = "gearyzhang@outlook.com"},
+]
+description = "A RLHF training framework for Vision-Language Models."
+keywords = ["pytorch","rlhf","VLM"]
+
+[project.optional-dependencies]
+eval = [
+    "GPTFactory @ git+https://github.com/TideDra/GPTFactory",
+    "vlmeval @ git+https://github.com/TideDra/VLMEvalKit",
+]
+extra = [
+    "shortuuid",
+    "groundingdino @ git+https://github.com/IDEA-Research/GroundingDINO.git",
+    "spacy",
+    "sglang[all]",
+    "gradio",
+    "openai"
+]
+all = [
+    "numpy",
+    "loguru",
+    "torch",
+    "torchvision",
+    "transformers",
+    "peft",
+    "deepspeed",
+    "accelerate",
+    "trl == 0.7.11",
+    "einops",
+    "tiktoken",
+    "matplotlib",
+    "pillow",
+    "transformers_stream_generator",
+    "wandb",
+    "jsonlines",
+    "scikit-learn",
+    "shortuuid",
+    "groundingdino @ git+https://github.com/IDEA-Research/GroundingDINO.git",
+    "spacy",
+    "sglang[all]",
+    "gradio",
+    "GPTFactory @ git+https://github.com/TideDra/GPTFactory",
+    "vlmeval @ git+https://github.com/TideDra/VLMEvalKit",
+    "fsspec==2023.10.0",
+    "openai"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["Woodpecker","*egg-info"]

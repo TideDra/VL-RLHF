@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 import torch
-from utils.data import build_dataset_from_vlquery_json
+from .utils.data import build_dataset_from_vlquery_json
 from transformers import HfArgumentParser
 from peft import LoraConfig
 import transformers
 import os
-from utils.auto_load import MyAutoProcessor, MyAutoModelWithValueHead, MyAutoPPOTrainer, MyAutoRewardModel, MyAutoGenerationConfig, MyAutoPPOCollator
-from utils.common import get_vision_tower, safe_save_model_for_ppo_trainer
+from .utils.auto_load import MyAutoProcessor, MyAutoModelWithValueHead, MyAutoPPOTrainer, MyAutoRewardModel, MyAutoGenerationConfig, MyAutoPPOCollator
+from .utils.common import get_vision_tower, safe_save_model_for_ppo_trainer
 from transformers import GPTQConfig, deepspeed
 from loguru import logger
 import trl

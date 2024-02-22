@@ -9,9 +9,9 @@ from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalPrediction
 from trl import RewardTrainer
 from trl.trainer.reward_config import RewardConfig
-from components.processor import VLProcessor
+from .processor import VLProcessor
 import torch
-from components.collator import VLRMDataCollatorWithPadding
+from .collator import VLRMDataCollatorWithPadding
 from abc import ABC
 class VLRMTrainer(RewardTrainer,ABC):
     def __init__(
