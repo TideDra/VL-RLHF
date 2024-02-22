@@ -44,7 +44,7 @@ def collator(batch):
     answers = [b['answer'] for b in batch]
     questions = [b['question'] for b in batch]
     images = [b['image'] for b in batch]
-    inputs = [{'image_path':i,'question':'<image>\n'+q} for i,q in zip(images,questions)]
+    inputs = [{'image_path':i,'question':q} for i,q in zip(images,questions)]
     return ids,answers,questions,categories,inputs
 
 
