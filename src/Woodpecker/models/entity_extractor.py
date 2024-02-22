@@ -1,6 +1,6 @@
 from typing import  Dict
 from sglang import function,user,assistant,system,gen
-
+import inflect
 @function
 def extractor(s,sentence):
     s += system('''You are an AI assistant that extracts the entities within the given sentence. 
@@ -19,7 +19,8 @@ Extract entity in the singular form. Output all the extracted types of items in 
     s += assistant("Output:\n"+gen('entities'))
 
 class EntityExtractor:
-    
+    def __init__(self):
+        self.singular_noun = inflect.engine().singular_noun
     def extract_entity(self, sample: Dict):
         extracted_entities = []
         for sent in sample['split_sents']:
@@ -30,4 +31,5 @@ class EntityExtractor:
 
     def get_res(self,sent: str,):
         state = extractor.run({'sentence':sent},temperature=0,max_new_tokens=1024)
-        return state['entities'].strip()
+        entities = [self.singular_noun(ent) if self.singular_noun(ent) else ent for ent in state['entities'].strip().split('.')]
+        return '.'.join(entities)

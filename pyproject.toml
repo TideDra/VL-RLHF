@@ -46,6 +46,7 @@ extra = [
     "sglang[all]",
     "gradio",
     "openai",
+    "inflect"
 ]
 
 [tool.setuptools.packages.find]
