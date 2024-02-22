@@ -30,13 +30,14 @@ def process_batch(batch):
         batch[k]['output'] = s['answer']
 
 
-def get_all_answers(entity_list, qs, ent_info, input_img_path, cur_answers,batch):
+def get_all_answers(entity_list, qs, ent_info, input_img_path, cur_answers,batch,is_multi):
     # This should return a dict. Since a question may correspond to multiple instances of a same kind of object.
     # case 1: involve multiple entities or 'where' type question: use the whole img.
     overall = len(entity_list)>1 or \
             'where' in qs.lower() or \
             any([ent not in ent_info for ent in entity_list]) or \
-            ent_info[entity_list[0]]['total_count'] == "unknown"
+            ent_info[entity_list[0]]['total_count'] == "unknown" or \
+            is_multi
     if overall:
         answer = get_answer_or_prepare(input_img_path,None,qs,batch) 
         cur_answers.setdefault('overall', [])   # use a special category 'overall' to denote answers that involve multiple objects.
@@ -97,10 +98,14 @@ class Answerer:
             cur_answers = {}
             for cur_qs in gen_qs:
                 qs, entity = cur_qs # qs is a str. entity is also a str. may contain multiple entity connected by periods.
-                entity_list = entity.split('.')
+                is_multi = False
+                if '(multi)' in entity:
+                    is_multi = True
+
+                entity_list = entity.replace('(multi)','').replace('(single)','').split('.')
                 entity_list = [e.strip() for e in entity_list if e.strip()]
                 
-                cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch)
+                cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch,is_multi)
             all_answers.append(cur_answers)
 
         process_batch(batch)
@@ -113,10 +118,14 @@ class Answerer:
             cur_answers = {}
             for cur_qs in gen_qs:
                 qs, entity = cur_qs # qs is a str. entity is also a str. may contain multiple entity connected by periods.
-                entity_list = entity.split('.')
+                is_multi = False
+                if '(multi)' in entity:
+                    is_multi = True
+
+                entity_list = entity.replace('(multi)','').replace('(single)','').split('.')
                 entity_list = [e.strip() for e in entity_list if e.strip()]
                 
-                cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch)
+                cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch,is_multi)
             all_answers.append(cur_answers)
 
         sample['generated_answers'] = all_answers

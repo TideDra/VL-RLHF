@@ -7,15 +7,15 @@ import spacy
 # Do not ask questions related to position or position relationship.
 NUM_SECONDS_TO_SLEEP = 0.5
 PROMPT_TEMPLATE='''Given a sentence and some entities connnected by periods, you are required to ask some relevant questions about the specified entities involved in the sentence, so that the questions can help to verify the factuality of the sentence.
-Questions may involve basic attributes such as colors, actions mentioned in the sentence. Do not ask questions involving object counts or the existence of object. For example, do not ask questions like "How many dogs are there in the image?" or "Is there a dog in the image?".
+Questions may involve basic attributes such as colors, actions mentioned in the sentence. Do not ask questions involving object counts or the existence of object. For example, do not ask questions like "How many dogs are there in the image?" or "Is there a dog in the image?". Do not ask special interrogative sentences, which start with "How", "Why", "What", "Where", "When". You should Ask questions that can be easily answered by yes or no.
 When asking questions about attributes, try to ask simple questions that only involve one entity. 
-Ask questions that can be easily decided visually. Do not ask questions that require complex reasoning.
+Ask questions that can be easily decided visually. Do not ask questions that require complex reasoning. The question should be easily answered by yes or no.
 Do not ask semantically similar questions. Do not ask questions only about scenes or places.
 Do not ask questions about uncertain or conjecture parts of the sentence, for example, the parts described with "maybe" or "likely", etc.
 It is no need to cover all the specified entities. If there is no question to ask, simply output a 'None'.
 When asking questions, do not assume the claims in the description as true in advance. Only ask questions relevant to the information in the sentence.
 Only ask questions about common, specific and concrete entities. The entities involved in the questions are limited to the range within the given entities.
-Output only one question in each line. For each line, first output the question, then a single '&', and finally entities involved in the question, still connected by periods if multiple entities are involved. 
+Output only one question in each line. For each line, first output the question, then a single '&', and finally entities involved in the question, still connected by periods if multiple entities are involved. If there is only one entity involved, but the entity indicates multiple instances, then add '(multi)' at the end, else if the entity indicates only one instance, then add '(single)' at the end. If there are multiple entities involved, also add '(multi)' at the end. For example, "Is this cat sleeping?&cat(single)", in which case the question is about a single cat, so we add '(single)', "Are the dogs barking?&dog(multi)", in which case the question is about multiple dogs, so we add '(multi)', "Is the man shaking hands with the woman?&man.woman(multi)", in which case the question involves multiple entities, so we add '(multi)'.
 If the question only involves one entity, you should use the word 'this' to refer the entity, like "this person", "this dog".
 Again, Do not ask "How many" or "Is there" questions.
 Examples:
@@ -26,8 +26,8 @@ Entities:
 dog.cat
 
 Questions:
-What color is this cat?&cat
-What color is this dog?&dog
+Is this a white cat?&cat(single)
+Is this a black dog?&dog(single)
 
 Sentence:
 The man is wearing a baseball cap and appears to be smoking.
@@ -36,8 +36,8 @@ Entities:
 man
 
 Questions:
-What is this man wearing?&man
-What is this man doing?&man
+Is this man wearing a baseball cap?&man(single)
+Is this man smoking?&man(single)
 
 Sentence:
 The image depicts a busy kitchen, with a man in a white apron. The man is standing in the middle of the kitchen.
@@ -46,8 +46,8 @@ Entities:
 kitchen.man
 
 Questions:
-What does this man wear?&man
-Is the man standing in the middle of the kitchen?&man.kitchen
+Is this man wearing a white apron?&man(single)
+Is this man standing in the middle of the kitchen?&man.kitchen(multi)
 
 Sentence:
 There is a person partially visible in the background.
@@ -56,18 +56,18 @@ Entities:
 person
 
 Questions:
-Is this person partially visible in the background?&person
+Is this person partially visible in the background?&person(single)
 
 Sentence:
-The woman and the man next to her are both laughing.
+The woman and the men next to her are laughing.
 
 Entities:
 woman.man
 
 Questions:
-Is this woman laughing?&woman
-Is this man laughing?&man
-Is the man stand next to the woman?&woman.man
+Is this woman laughing?&woman(single)
+Are the men laughing?&man(multi)
+Are the men standing next to the woman?&woman.man(multi)
 
 Sentence:
 There are several other people in the background of the photo, some of whom are more focused on the man and woman, while others appear to be engaged in party activities.
@@ -76,8 +76,8 @@ Entities:
 person.man.woman
 
 Questions:
-Is this person in the background of the photo?&person
-Are some of the people in the background focused on the man and woman?&person.man.woman
+Is this person in the background of the photo?&person(single)
+Are some of the people in the background focused on the man and woman?&person.man.woman(multi)
 
 Sentence:
 {sent}
@@ -145,6 +145,6 @@ class Questioner:
 
         res = [s for s in res if len(s)==2]
         res = remove_duplicates(res)
-        res = [s for s in res if set(s[1].split('.')).issubset(set(entity_list)) ]
+        res = [s for s in res if set(s[1].replace('(single)','').replace('(multi)','').split('.')).issubset(set(entity_list)) ]
 
         return res
