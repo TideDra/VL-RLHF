@@ -4,22 +4,31 @@ from typing import Dict
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from models.utils import compute_iou
 import torch
+from sglang import function,user,assistant,system,gen
 
-def format_inputs(question: str, answer: str):
-    return f"{answer} \\n {question}"
+@function
+def claimer(s,question,answer):
+    s += system("You are an AI assistant that helps to summarize facts from given QA pairs. The summary should only contain facts related to the question, and you should ignore other facts unrelated to the question. Do not mention red bounding box and image in the summary if they are mentioned in the answer.")
+    s += user('''Question: What is the man doing?
+Answer: The man in the red bounding box appears to be in the process of cutting a cake. He is holding a knife and is leaning over a table with the cake on it. It looks like he is either about to make the first cut or has just finished cutting a piece. The setting suggests a casual, possibly festive occasion, given the presence of a cake and the man's attire, which includes a colorful shirt and a lei.''')
+    s += assistant("Summary: The man is cutting a cake, holding a knife and leaning over a table with the cake on it.")
+    s += user('''Question: Is this person sitting on the couch?
+Answer: Yes, there is a person sitting on the couch in the image.''')
+    s += assistant("Summary: There is a person sitting on the couch.")
+    s += user('''Question:Is the woman holding the drink close to the camera?
+Answer: No, the woman holding the drink in the red bounding box is far away from the camera.''')
+    s += assistant("Summary: The woman holding the drink is far away from the camera.")
+    s += user(f"Question: {question}\nAnswer: {answer}")
+    s += assistant(gen('claim'))
 
-def get_claim(tokenizer, model, question, answer):
+def get_claim(question, answer):
     if isinstance(question, str):
         question = [question]
     if isinstance(answer, str):
         answer = [answer]
     assert len(question) == len(answer)
-    input_text = [format_inputs(q, a) for q, a in zip(question, answer)]
-    input_ids = tokenizer(input_text, return_tensors="pt", padding='longest', truncation=True, max_length=512).input_ids.to(model.device)
-    with torch.inference_mode():
-        generated_ids = model.generate(input_ids, max_length=64, num_beams=4, early_stopping=True)
-    ans = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
-    return ans
+    states = claimer.run_batch([{ 'question': q, 'answer': a} for q, a in zip(question, answer)],temperature=0,max_new_tokens=256)
+    return [s['claim'].replace("Summary: ",'') for s in states]
 
 class ClaimGenerator:
     '''
@@ -50,10 +59,8 @@ class ClaimGenerator:
                             }
     '''
     
-    def __init__(self, qa2c_model_path,device='cuda'):
+    def __init__(self, device='cuda'):
         self.device=device
-        self.model = AutoModelForSeq2SeqLM.from_pretrained(qa2c_model_path).to(device)
-        self.tokenizer = AutoTokenizer.from_pretrained(qa2c_model_path)
 
     def generate_claim(self, sample: Dict):
         # claim from two parts. counting info and Q&A
@@ -71,7 +78,7 @@ class ClaimGenerator:
                         qs, ans = qa_tuple
                         questions.append(qs)
                         answers.append(ans)
-                    clm = get_claim(self.tokenizer, self.model, questions, answers)
+                    clm = get_claim(questions, answers)
                     all_claim['overall'] += clm
                 else:
                     all_claim.setdefault('specific', {}).setdefault(entity, [])
@@ -84,7 +91,7 @@ class ClaimGenerator:
                             qs, ans = qa_tuple
                             questions.append(qs)
                             answers.append(ans)
-                        clm = get_claim(self.tokenizer, self.model, questions, answers)
+                        clm = get_claim(questions, answers)
                         all_claim['specific'][entity][idx] += clm
                            
         # second part, counting info

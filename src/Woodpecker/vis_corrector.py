@@ -15,7 +15,7 @@ import gc
 from sglang import set_default_backend, RuntimeEndpoint
 from sglang.utils import http_request
 class Corrector:
-    def __init__(self, api_key=None,end_point=None,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,qa2c_model_path=None,device='cuda') -> None:
+    def __init__(self, api_key=None,end_point=None,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,device='cuda') -> None:
         # init all the model
         self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point,temperature=0.7)
         if refiner_key is not None and refiner_end_point is not None:
@@ -30,7 +30,7 @@ class Corrector:
         self.detector = Detector(detector_config,detector_model_path,cache_dir,device=device)
         self.questioner = Questioner(self.chatbot)
         self.answerer = Answerer(device=device)
-        self.claim_generator = ClaimGenerator(qa2c_model_path,device=device)
+        self.claim_generator = ClaimGenerator(device=device)
         self.refiner = Refiner(self.refiner_chatbot)
         self.cache_dir = cache_dir
         print("Finish loading models.")
