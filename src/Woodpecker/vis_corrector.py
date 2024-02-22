@@ -13,6 +13,7 @@ from GPTFactory import GPT
 import torch
 import gc
 from sglang import set_default_backend, RuntimeEndpoint
+from sglang.utils import http_request
 class Corrector:
     def __init__(self, api_key=None,end_point=None,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,qa2c_model_path=None,device='cuda') -> None:
         # init all the model
@@ -21,7 +22,9 @@ class Corrector:
             self.refiner_chatbot = GPT(model='gpt-4',service=api_service,api_key=refiner_key,end_point=refiner_end_point,temperature=0.7)
         else:
             self.refiner_chatbot = self.chatbot
-        set_default_backend(RuntimeEndpoint(val_model_endpoint))
+        self.runtime = RuntimeEndpoint(val_model_endpoint)
+        set_default_backend(self.runtime)
+        http_request(self.runtime.base_url+"/flush_cache")
         self.preprocessor = PreProcessor(self.chatbot)
         self.entity_extractor = EntityExtractor(self.chatbot)
         self.detector = Detector(detector_config,detector_model_path,cache_dir,device=device)
