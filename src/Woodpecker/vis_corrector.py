@@ -8,7 +8,7 @@ from models.refiner import Refiner
 from tqdm import tqdm
 from typing import List, Dict
 import time
-import shutil
+import os
 from GPTFactory import GPT
 import torch
 import gc
@@ -54,7 +54,7 @@ class Corrector:
         print("start refining...")
         sample = self.refiner.generate_output(sample)
         print('done')
-        shutil.rmtree(self.cache_dir)
+        os.system(f"rm -rf {self.cache_dir}")
         torch.cuda.empty_cache()
         gc.collect()
         return sample

@@ -45,35 +45,7 @@ extra = [
     "spacy",
     "sglang[all]",
     "gradio",
-    "openai"
-]
-all = [
-    "numpy",
-    "loguru",
-    "torch",
-    "torchvision",
-    "transformers",
-    "peft",
-    "deepspeed",
-    "accelerate",
-    "trl == 0.7.11",
-    "einops",
-    "tiktoken",
-    "matplotlib",
-    "pillow",
-    "transformers_stream_generator",
-    "wandb",
-    "jsonlines",
-    "scikit-learn",
-    "shortuuid",
-    "groundingdino @ git+https://github.com/IDEA-Research/GroundingDINO.git",
-    "spacy",
-    "sglang[all]",
-    "gradio",
-    "GPTFactory @ git+https://github.com/TideDra/GPTFactory",
-    "vlmeval @ git+https://github.com/TideDra/VLMEvalKit",
-    "fsspec==2023.10.0",
-    "openai"
+    "openai",
 ]
 
 [tool.setuptools.packages.find]

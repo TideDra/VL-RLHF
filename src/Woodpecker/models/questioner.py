@@ -122,7 +122,7 @@ class Questioner:
         
         qs_list = []
         for ent_list, sent in zip(global_entity_list, sentences):
-            exist_entity = [ent for ent in ent_list if ent in global_entity_dict and global_entity_dict[ent]['total_count'] > 0]
+            exist_entity = [ent for ent in ent_list if ent in global_entity_dict and global_entity_dict[ent]['total_count'] != 0]
             
             # border case: no detection result for any entity. no question asked.
             if len(exist_entity)==0 :

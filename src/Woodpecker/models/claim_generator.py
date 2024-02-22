@@ -106,6 +106,8 @@ class ClaimGenerator:
         for entity, ent_info in sample['entity_info'].items():
             counting_claim_list = []
             ent_counts = ent_info['total_count']
+            if ent_counts == "unknown":
+                continue
             if ent_counts == 0 and entity != "":
                 counting_claim += f"There is no {entity}.\n\n"
                 continue

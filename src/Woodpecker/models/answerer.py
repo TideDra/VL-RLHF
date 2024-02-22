@@ -11,9 +11,10 @@ def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
         if img_path is not None:
             new_qs = f"Focus on the region annotated by the red bounding box in this image, {qs}"
             prompt = new_qs
+            batch[(raw_img_path,img_path,qs)] = {'prompt': prompt, 'img_path':img_path}
         else:
             prompt = qs
-        batch[(raw_img_path,img_path,qs)] = {'prompt': prompt, 'img_path':img_path}
+            batch[(raw_img_path,img_path,qs)] = {'prompt': prompt, 'img_path':raw_img_path}
         return None
     else:
         return batch[(raw_img_path,img_path,qs)].get('output', None)
@@ -32,8 +33,11 @@ def process_batch(batch):
 def get_all_answers(entity_list, qs, ent_info, input_img_path, cur_answers,batch):
     # This should return a dict. Since a question may correspond to multiple instances of a same kind of object.
     # case 1: involve multiple entities or 'where' type question: use the whole img.
-    if len(entity_list)>1 or 'where' in qs.lower() or any([ent not in ent_info for ent in entity_list]):
-
+    overall = len(entity_list)>1 or \
+            'where' in qs.lower() or \
+            any([ent not in ent_info for ent in entity_list]) or \
+            ent_info[entity_list[0]]['total_count'] == "unknown"
+    if overall:
         answer = get_answer_or_prepare(input_img_path,None,qs,batch) 
         cur_answers.setdefault('overall', [])   # use a special category 'overall' to denote answers that involve multiple objects.
         cur_answers['overall'].append((qs, answer))
