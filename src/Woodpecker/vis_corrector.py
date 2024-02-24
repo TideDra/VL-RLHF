@@ -28,7 +28,7 @@ class Corrector:
         self.preprocessor = PreProcessor()
         self.entity_extractor = EntityExtractor()
         self.detector = Detector(detector_config,detector_model_path,cache_dir,device=device)
-        self.questioner = Questioner(self.chatbot)
+        self.questioner = Questioner()
         self.answerer = Answerer(device=device)
         self.claim_generator = ClaimGenerator(device=device)
         self.refiner = Refiner(self.refiner_chatbot)

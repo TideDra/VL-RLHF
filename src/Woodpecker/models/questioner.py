@@ -3,10 +3,12 @@ from tqdm import tqdm
 import openai
 import time
 import spacy
-
+from sglang import function,system,user,assistant,gen
 # Do not ask questions related to position or position relationship.
-NUM_SECONDS_TO_SLEEP = 0.5
-PROMPT_TEMPLATE='''Given a sentence and some entities connnected by periods, you are required to ask some relevant questions about the specified entities involved in the sentence, so that the questions can help to verify the factuality of the sentence.
+
+@function
+def questioner(s,sentence,entity):
+    s += system('''Given a sentence and some entities connnected by periods, you are required to ask some relevant questions about the specified entities involved in the sentence, so that the questions can help to verify the factuality of the sentence.
 Questions may involve basic attributes such as colors, actions mentioned in the sentence. Do not ask questions involving object counts or the existence of object. For example, do not ask questions like "How many dogs are there in the image?" or "Is there a dog in the image?". Do not ask special interrogative sentences, which start with "How", "Why", "What", "Where", "When". You should Ask questions that can be easily answered by yes or no.
 When asking questions about attributes, try to ask simple questions that only involve one entity. 
 Ask questions that can be easily decided visually. Do not ask questions that require complex reasoning. The question should be easily answered by yes or no.
@@ -17,75 +19,57 @@ When asking questions, do not assume the claims in the description as true in ad
 Only ask questions about common, specific and concrete entities. The entities involved in the questions are limited to the range within the given entities.
 Output only one question in each line. For each line, first output the question, then a single '&', and finally entities involved in the question, still connected by periods if multiple entities are involved. If there is only one entity involved, but the entity indicates multiple instances, then add '(multi)' at the end, else if the entity indicates only one instance, then add '(single)' at the end. If there are multiple entities involved, just add '(multi)' after the last entity. For example, "Is this cat sleeping?&cat(single)", in which case the question is about a single cat, so we add '(single)', "Are the dogs barking?&dog(multi)", in which case the question is about multiple dogs, so we add '(multi)', "Is the man shaking hands with the woman?&man.woman(multi)", in which case the question involves multiple entities, so we add '(multi)' at the end. Note that you only need to add '(multi)' or '(single)' after the last entity, and do not need to add '(multi)' or '(single)' after the other entities.
 If the question only involves one entity, you should use the word 'this' to refer the entity, like "this person", "this dog".
-Again, Do not ask "How many" or "Is there" questions.
-Examples:
-Sentence:
+Again, Do not ask "How many" or "Is there" questions.''')
+    s += user('''Sentence:
 There are one black dog and two white cats in the image.
 
 Entities:
-dog.cat
-
-Questions:
+dog.cat''')
+    s += assistant('''Questions:
 Is this a white cat?&cat(single)
-Is this a black dog?&dog(single)
-
-Sentence:
+Is this a black dog?&dog(single)''')
+    s += user('''Sentence:
 The man is wearing a baseball cap and appears to be smoking.
 
 Entities:
-man
-
-Questions:
+man''')
+    s += assistant('''Questions:
 Is this man wearing a baseball cap?&man(single)
-Is this man smoking?&man(single)
-
-Sentence:
+Is this man smoking?&man(single)''')
+    s += user('''Sentence:
 The image depicts a busy kitchen, with a man in a white apron. The man is standing in the middle of the kitchen.
 
 Entities:
-kitchen.man
-
-Questions:
+kitchen.man''')
+    s += assistant('''Questions:
 Is this man wearing a white apron?&man(single)
-Is this man standing in the middle of the kitchen?&man.kitchen(multi)
-
-Sentence:
+Is this man standing in the middle of the kitchen?&man.kitchen(multi)''')
+    s += user('''Sentence:
 There is a person partially visible in the background.
 
 Entities:
-person
-
-Questions:
-Is this person partially visible in the background?&person(single)
-
-Sentence:
+person''')
+    s += assistant('''Questions:
+Is this person partially visible in the background?&person(single)''')
+    s += user('''Sentence:
 The woman and the men next to her are laughing.
 
 Entities:
-woman.man
-
-Questions:
+woman.man''')
+    s += assistant('''Questions:
 Is this woman laughing?&woman(single)
 Are the men laughing?&man(multi)
-Are the men standing next to the woman?&woman.man(multi)
-
-Sentence:
+Are the men standing next to the woman?&woman.man(multi)''')
+    s += user('''Sentence:
 There are several other people in the background of the photo, some of whom are more focused on the man and woman, while others appear to be engaged in party activities.
 
 Entities:
-person.man.woman
-
-Questions:
-Is this person in the background of the photo?&person(single)
-Are some of the people in the background focused on the man and woman?&person.man.woman(multi)
-
-Sentence:
-{sent}
-
-Entities:
-{entity}
-
-Questions:'''
+person.man.woman''')
+    s += assistant('''Questions:
+Are there people in the background of the photo?&person(multi)
+Are some of the people in the background focused on the man and woman?&person.man.woman(multi)''')
+    s += user(f"Sentence:\n{sentence}\n\nEntities:\n{entity}")
+    s += assistant("Questions:\n"+gen("question"))
 
 
 def remove_duplicates(res):
@@ -109,9 +93,7 @@ class Questioner:
             For each splitted sentences:
                 A list of 2-ele list: [[question, involved object type], [qs, obj], ...]         
     '''
-    def __init__(self, chatbot):
-
-        self.chatbot =chatbot
+    def __init__(self):
     
         self.nlp = spacy.load("en_core_web_sm")
         
@@ -134,12 +116,11 @@ class Questioner:
         sample['generated_questions'] = qs_list
         return sample
     
-    def get_res(self,nlp, entity: str, sent: str, max_tokens: int=1024,model='gpt-3.5-turbo'):
-        content = PROMPT_TEMPLATE.format(sent=sent, entity=entity)
+    def get_res(self,nlp, entity: str, sent: str):
 
-        response = self.chatbot.complete(content)
+        state = questioner.run(sentence=sent, entity=entity,temperature=0,max_new_tokens=512)
 
-        res = response.splitlines()
+        res = state['question'].splitlines()
         res = [s.split('&') for s in res if s.lower() != 'none']
         entity_list = entity.split('.')
 
