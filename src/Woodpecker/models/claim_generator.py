@@ -8,7 +8,7 @@ from sglang import function,user,assistant,system,gen
 
 @function
 def claimer(s,question,answer):
-    s += system("You are an AI assistant that helps to summarize facts from given QA pairs. The summary should only contain facts related to the question, and you should ignore other facts unrelated to the question. Do not mention red bounding box and image in the summary if they are mentioned in the answer.")
+    s += system("You are an AI assistant that helps to summarize facts from given QA pairs. The summary should only contain facts related to the question, and you should ignore other facts unrelated to the question. The answer may mention a red bounding box, you should ignore the bounding box and do not mention it in the summary.")
     s += user('''Question: What is the man doing?
 Answer: The man in the red bounding box appears to be in the process of cutting a cake. He is holding a knife and is leaning over a table with the cake on it. It looks like he is either about to make the first cut or has just finished cutting a piece. The setting suggests a casual, possibly festive occasion, given the presence of a cake and the man's attire, which includes a colorful shirt and a lei.''')
     s += assistant("Summary: The man is cutting a cake, holding a knife and leaning over a table with the cake on it.")
