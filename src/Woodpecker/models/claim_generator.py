@@ -121,7 +121,7 @@ class ClaimGenerator:
             if ent_counts == "unknown":
                 continue
             if ent_counts == 0 and entity != "":
-                counting_claim += f"There is no {entity}.\n\n"
+                counting_claim += f"There is no {entity}.\n"
                 continue
             else:
                 counting_claim += f"There are {ent_counts} {entity}.\n"
@@ -133,7 +133,7 @@ class ClaimGenerator:
                         final_name = ent_alias
                     else:
                         final_name = f"({ent_alias})"
-                    box_claim_list.append(f"{final_name}: {bbox}")
+                    box_claim_list.append(f"{final_name}")
                 counting_claim += '\n'.join(box_claim_list) + '\n\n'
                 
         all_claim['counting'] = counting_claim

@@ -7,19 +7,17 @@ from tqdm import tqdm
 NUM_SECONDS_TO_SLEEP = 0.3
 SYS_MESSAGE='''Given a query, a passage and some supplementary information, you are required to correct and output the refined passage in a fluent and natural style, following these rules:
 1. The supplementary information may include some of the following parts:
-    "Counting" information that specifies how many instances of a certain kind of entity exist, and their associated bounding boxes;
-    "Specific" information that describes attribute information specific to each entity instance, including bounding boxes, colors, etc. The information is arranged in the form of "entity 1: [bbox] "info of this entity". Note that the entity in "Specific" information corresponds to that in the "Counting" information.
+    "Counting" information that specifies how many instances of a certain kind of entity exist, the name of each instance will be listed in the form of "entity 1\nentity 2\nentity 3\n...";
+    "Specific" information that describes attribute information specific to each entity instance. The information is arranged in the form of "entity 1: info of this entity". Note that the entity in "Specific" information corresponds to that in the "Counting" information.
     "Overall" information that may involve information about multiple entity objects. 
 2. Mark the words in the passage with <f> and </f> tag if they are inconsistent with the supplementary information, and then append the corrected words marked with <t> and </t> tag after the wrong words. The corrected words must be the same topic as the original wrong words, which means you cannot just replace the wrong words with an arbitrary fact that provides different information from the original words.
 3. The structure of the corrected sentence should be consistent with the original sentence as possible. Try to correct as few words as possible, but make sure the sentence is fluent, natural and complete after correction, also considering the punctuation.
 4. The number of entitie instances should match the number in the 'Counting' information. Also correct the number counts if the number stated in the original sentence does not match the counting information.
 5. If the passage mentions entity or attribute that does not exist in the supplementary information, then mark the words and remove it, where 'remove' means the corrected words should be empty, or a simple '<t></t>' tag in other words. If the removed words contain some entities that truly exist, you should rewrite the sentence and contain the entities, instead of leaving an empty sentence. Note that the corrected sentence should be fluent, natural and complete after removal. So you should choose the words to remove carefully, also considering the punctuation.
-6. In the refined passage, when describing entities mentioned in the "Specific" supplementary information, add their associated bounding boxes in parentheses right after them, in the form of "entity([bbox])". If multiple entities of the same kind are mentioned, then seperate the box with ';', in the form of "entity([bbox1];[bbox2])"
-7. When deriving position relationships between entity instances, try to also use the bounding boxes information, which are represented as [x1, y1, x2, y2] with floating numbers ranging from 0 to 1. These values correspond to the top left x1, top left y1, bottom right x2, and bottom right y2. 
-8. When giving refined passage, also pay attention to the given query. The refined passage should be reasonable answers to the query.
-9. Note that instances of a certain category can also belong to its super-catergories. For example, a bus is also a car. Different name of the same instance will be shown together. For example, we use (car 1, bus 2) to denote that car 1 and bus 2 are the same instance. You should also consider this information and refine the passage correctly.
-10. The specific information and the overall information may be conflict with the counting information. For example, the counting information says there is 1 car, but the specific information implies that there are 2 cars. In this case, you should ignore the specific information and trust the counting information.
-11. You should only correct the given passage, do not add any extra sentences. Even if you think the supplement information is wrong, you do not need to correct it in the final output. Just make sure every wrong sentence in the output refined passage is from the original passage.
+6. When giving refined passage, also pay attention to the given query. The refined passage should be reasonable answers to the query.
+7. Note that instances of a certain category can also belong to its super-catergories. For example, a bus is also a car. Different name of the same instance will be shown together. For example, we use (car 1, bus 2) to denote that car 1 and bus 2 are the same instance. You should also consider this information and refine the passage correctly.
+8. The specific information and the overall information may be conflict with the counting information. For example, the counting information says there is 1 car, but the specific information implies that there are 2 cars. In this case, you should ignore the specific information and trust the counting information.
+9. You should only correct the given passage, do not add any extra sentences. Even if you think the supplement information is wrong, you do not need to correct it in the final output. Just make sure every wrong sentence in the output refined passage is from the original passage.
 '''
 
 EXAMPLE1=[
@@ -27,18 +25,17 @@ EXAMPLE1=[
         'content':'''Supplementary information:
 Counting: 
 There are 1 snowboard.
-snowboard 1: [0.498, 0.555, 0.513, 0.577]
+snowboard 1
 
 There are 1 person.
-person 1: [0.496, 0.467, 0.535, 0.568]
+person 1
 
 There are 1 slope.
-slope 1: [0.002, 0.002, 0.998, 0.998]
+slope 1
 
 Specific:
-person 1: [0.496, 0.467, 0.535, 0.568] The person is doing snowboarding.
-
-slope 1: [0.002, 0.002, 0.998, 0.998] The slope is covered with snow.
+person 1: The person is doing snowboarding.
+slope 1: The slope is covered with snow.
 
 
 Query:
@@ -51,7 +48,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content': "<f>No, there is no snowboard in the image.</f><t>Yes, there is a snowboard([0.498, 0.555, 0.513, 0.577]) in the image.</t> The image shows a person([0.496, 0.467, 0.535, 0.568]) <f>skiing down</f><t>doing snowboarding on</t> a snow-covered slope([0.002, 0.002, 0.998, 0.998])."
+        'content': "<f>No, there is no snowboard in the image.</f><t>Yes, there is a snowboard in the image.</t> The image shows a person <f>skiing down</f><t>doing snowboarding on</t> a snow-covered slope."
     }
 ]
 
@@ -60,15 +57,15 @@ EXAMPLE2=[
         'content':'''Supplementary information:
 Counting: 
 There are 3 car.
-car 1: [0.289, 0.637, 0.309, 0.661]
-car 2: [0.315, 0.633, 0.324, 0.662]
-(car 3, bus 1): [0.318, 0.092, 0.85, 0.963]
+car 1
+car 2
+(car 3, bus 1)
 
 There are 1 bus.
-(car 3, bus 1): [0.318, 0.092, 0.85, 0.963]
+(car 3, bus 1)
 
 Specific:
-(car 3, bus 1): [0.318, 0.092, 0.85, 0.963] The bus is red.
+(car 3, bus 1): The bus is red.
 
 
 Query:
@@ -81,7 +78,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':"<f>No, there is no car in the image.</f><t>Yes, there are cars([0.289, 0.637, 0.309, 0.661];[0.315, 0.633, 0.324, 0.662];[0.318, 0.092, 0.85, 0.963]) in the image.</t> The image features a red double-decker bus([0.318, 0.092, 0.85, 0.963])."
+        'content':"<f>No, there is no car in the image.</f><t>Yes, there are cars in the image.</t> The image features a red double-decker bus."
     }
 ]
 
@@ -92,10 +89,10 @@ Counting:
 There is no sports ball.
 
 There are 1 soccer ball.
-soccer ball 1: [0.682, 0.32, 0.748, 0.418]
+soccer ball 1
 
 Specific:
-soccer ball 1: [0.682, 0.32, 0.748, 0.418] The soccer ball is in the image.
+soccer ball 1: The soccer ball is in the image.
 
 
 Query:
@@ -108,7 +105,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':"Yes, there is a sports ball([0.682, 0.32, 0.748, 0.418]) in the image, and it appears to be a soccer ball([0.682, 0.32, 0.748, 0.418])."
+        'content':"Yes, there is a sports ball in the image, and it appears to be a soccer ball."
     }
 ]
 
@@ -117,10 +114,10 @@ EXAMPLE4=[
         'content':'''Supplementary information:
 Counting: 
 There are 1 ball.
-(ball 1, soccer ball 1): [0.682, 0.32, 0.748, 0.418]
+(ball 1, soccer ball 1)
 
 Specific:
-(ball 1, soccer ball 1): [0.682, 0.32, 0.748, 0.418] The soccer ball is in the image.
+(ball 1, soccer ball 1): The soccer ball is in the image.
 
 
 Query:
@@ -143,10 +140,10 @@ EXAMPLE5=[
         'content':'''Supplementary information:
 Counting: 
 There are 4 dogs.
-dogs 1: [0.668, 0.454, 0.728, 0.651]
-dogs 2: [0.337, 0.529, 0.427, 0.747]
-dogs 3: [0.438, 0.254, 0.49, 0.439]
-dogs 4: [0.353, 0.325, 0.418, 0.535]
+dogs 1
+dogs 2
+dogs 3
+dogs 4
 
 
 Query:
@@ -159,7 +156,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':"<f>No</f><t>Yes</t>, there are <f>only 3</f><t>four</t> dogs([0.668, 0.454, 0.728, 0.651];[0.337, 0.529, 0.427, 0.747];[0.438, 0.254, 0.49, 0.439];[0.353, 0.325, 0.418, 0.535]) in the image."
+        'content':"<f>No</f><t>Yes</t>, there are <f>only 3</f><t>four</t> dogs in the image."
     
     }
 ]
@@ -169,11 +166,11 @@ EXAMPLE6=[
         'content':'''Supplementary information:
 Counting: 
 There are 1 bicycle.
-bicycle 1: [0.467, 0.555, 0.717, 0.746]
+bicycle 1
 
 There are 2 trash bin.
-trash bin 1: [0.145, 0.498, 0.321, 0.728]
-trash bin 2: [0.319, 0.497, 0.483, 0.729]
+trash bin 1
+trash bin 2
 
 Overall:
 The bicycle is not on the right side of the trash bin.
@@ -189,7 +186,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':"<f>No</f><t>Yes</t>, the bicycle([0.467, 0.555, 0.717, 0.746]) is <f>not</f><t></t>on the right side of the trash bin([0.145, 0.498, 0.321, 0.728];[0.319, 0.497, 0.483, 0.729])."
+        'content':"<f>No</f><t>Yes</t>, the bicycle is <f>not</f><t></t>on the right side of the trash bin."
     }
 ]
 
@@ -198,14 +195,14 @@ EXAMPLE7=[
         'content':'''Supplementary information:
 Counting: 
 There are 3 car.
-car 1: [0.218, 0.306, 0.49, 0.646]
-car 2: [0.879, 0.401, 1.0, 0.635]
-car 3: [0.036, 0.0, 0.181, 0.172]
+car 1
+car 2
+car 3
 
 Specific:
-car 1: [0.218, 0.306, 0.49, 0.646] The car is black.
-car 2: [0.879, 0.401, 1.0, 0.635] The car is black.
-car 3: [0.036, 0.0, 0.181, 0.172] The car is white.
+car 1: The car is black.
+car 2: The car is black.
+car 3: The car is white.
 
 
 Query:
@@ -218,7 +215,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':"Yes, there is a black car([0.218, 0.306, 0.49, 0.646]) in the image."
+        'content':"Yes, there is a black car in the image."
     }
 ]
 
@@ -227,34 +224,34 @@ EXAMPLE8=[
         'content':'''Supplementary information:
 Counting: 
 There are 5 children.
-children 1: [0.001, 0.216, 0.258, 0.935]
-children 2: [0.573, 0.251, 0.98, 0.813]
-children 3: [0.569, 0.313, 0.701, 0.662]
-children 4: [0.31, 0.259, 0.582, 0.775]
-children 5: [0.224, 0.283, 0.401, 0.663]
+children 1
+children 2
+children 3
+children 4
+children 5
 
 There is no shirts.
 
 There are 1 field.
-field 1: [0.001, 0.444, 0.998, 0.997]
+field 1
 
 There are 2 frisbees.
-frisbees 1: [0.392, 0.473, 0.569, 0.713]
-frisbees 2: [0.72, 0.486, 0.941, 0.76]
+frisbees 1
+frisbees 2
 
 There is no backpack.
 
 There is no handbag.
 
 Specific:
-children 1: [0.001, 0.216, 0.258, 0.935] The shirts are red and white. The children are holding a pig. The children are sitting on the grass.
-children 2: [0.573, 0.251, 0.98, 0.813] The shirts are blue. The children are holding a frisbee. The children are sitting on the grass.
-children 3: [0.569, 0.313, 0.701, 0.662] The shirts are blue. The children are holding a teddy bear. The children are sitting on the grass.
-children 4: [0.31, 0.259, 0.582, 0.775] The shirts are brown. The children are holding a frisbee. The children are sitting on the grass.
-children 5: [0.224, 0.283, 0.401, 0.663] The shirts are red. The children are holding a ball. The children are sitting on the grass.
+children 1: The shirts are red and white. The children are holding a pig. The children are sitting on the grass.
+children 2: The shirts are blue. The children are holding a frisbee. The children are sitting on the grass.
+children 3: The shirts are blue. The children are holding a teddy bear. The children are sitting on the grass.
+children 4: The shirts are brown. The children are holding a frisbee. The children are sitting on the grass.
+children 5: The shirts are red. The children are holding a ball. The children are sitting on the grass.
 
-frisbees 1: [0.392, 0.473, 0.569, 0.713] The frisbees are white.
-frisbees 2: [0.72, 0.486, 0.941, 0.76] The frisbees are white.
+frisbees 1: The frisbees are white.
+frisbees 2: The frisbees are white.
 
 Overall:
 The children are sitting on the grass.
@@ -274,7 +271,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':'''The image shows a group of young children([0.001, 0.216, 0.258, 0.935];[0.573, 0.251, 0.98, 0.813];[0.569, 0.313, 0.701, 0.662];[0.31, 0.259, 0.582, 0.775];[0.224, 0.283, 0.401, 0.663]), <f>all wearing black shirts, </f><t></t>sitting in a grassy field([0.001, 0.444, 0.998, 0.997]). <f>They appear to be having a good time as they each hold two white frisbees.</f><t>Some of the children([0.573, 0.251, 0.98, 0.813];[0.31, 0.259, 0.582, 0.775]) are holding a white frisbee([0.392, 0.473, 0.569, 0.713];[0.72, 0.486, 0.941, 0.76]).</t>
+        'content':'''The image shows a group of young children, <f>all wearing black shirts, </f><t></t>sitting in a grassy field. <f>They appear to be having a good time as they each hold two white frisbees.</f><t>Some of the children are holding a white frisbee.</t>
 
 There's a total of <f>seven</f><t>five</t> children, ranging in age from young toddlers to older children, scattered throughout the scene. <f>Some of the children are standing while others are sitting</f><t>All the children are sitting</t>, enjoying their time in the field. 
 
@@ -288,28 +285,26 @@ EXAMPLE9=[
         'content':'''Supplementary information:
 Counting: 
 There are 1 horse.
-horse 1: [0.387, 0.227, 0.687, 0.798]
+horse 1
 
 There are 1 rider.
-rider 1: [0.479, 0.124, 0.654, 0.606]
+rider 1
 
 There are 1 pond.
-pond 1: [0.003, 0.601, 0.997, 0.995]
+pond 1
 
 There is no race.
 
 There are 1 water.
-water 1: [0.003, 0.578, 0.997, 0.994]
+water 1
 
 There are 1 helmet.
-helmet 1: [0.504, 0.126, 0.552, 0.179]
+helmet 1
 
 Specific:
-horse 1: [0.387, 0.227, 0.687, 0.798] The horse is jumping through water.
-
-rider 1: [0.479, 0.124, 0.654, 0.606] A horse is the rider seated on.
-
-helmet 1: [0.504, 0.126, 0.552, 0.179] A helmet and a bridle is essential for safety during such events.
+horse 1: The horse is jumping through water.
+rider 1: A horse is the rider seated on.
+helmet 1: A helmet and a bridle is essential for safety during such events.
 
 Overall:
 A horse is navigating the muddy pond.
@@ -330,7 +325,7 @@ Refined passage:'''
     },
     {
         'role':'assistant',
-        'content':'''The image features a horse([0.387, 0.227, 0.687, 0.798]) and rider([0.479, 0.124, 0.654, 0.606]) navigating a muddy pond([0.003, 0.601, 0.997, 0.995]) during a horse race. The horse is galloping <f>through</f><t>in</t> the water, with its rider firmly seated on its back. The rider is wearing a helmet([0.504, 0.126, 0.552, 0.179]), which is essential for safety during such events.
+        'content':'''The image features a horse and rider navigating a muddy pond during a horse race. The horse is galloping <f>through</f><t>in</t> the water, with its rider firmly seated on its back. The rider is wearing a helmet, which is essential for safety during such events.
 
 <f>There are several other horses in the scene, some closer to the foreground and others further back. The horses are spread out across the pond, with some closer to the left side and others closer to the right side.</f><t></t>The overall atmosphere of the scene is lively and exciting<f>, as the horses and riders compete in the muddy pond</f><t></t>.'''
     }
@@ -388,9 +383,9 @@ class Refiner:
                         final_name = ent_alias
                     else:
                         final_name = f"({ent_alias})"
-                    cur_entity_claim_list.append(f"{final_name}: {cur_inst_bbox} " + ' '.join(instance_claim_list))
+                    cur_entity_claim_list.append(f"{final_name}: " + ' '.join(instance_claim_list))
                 specific_claim_list.append('\n'.join(cur_entity_claim_list))
-            sup_info += '\n\n'.join(specific_claim_list)
+            sup_info += '\n'.join(specific_claim_list)
             sup_info += '\n\n'
             
         # add overall info.
@@ -402,7 +397,7 @@ class Refiner:
         sample['output'] = self.get_output(sample['query'], sample['input_desc'], sup_info)
         return sample
 
-    def get_output(self,query: str, text: str, sup_info: str, max_tokens: int=4096,model='gpt-3.5-turbo-16k'):
+    def get_output(self,query: str, text: str, sup_info: str):
         content = self.few_shot_examples+[{'role':'user','content':PROMPT_TEMPLATE.format(query=query, sup_info=sup_info, text=text)}]
 
         response = self.chatbot.complete(content,system_message=self.sys_message)
