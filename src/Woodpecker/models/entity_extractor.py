@@ -1,4 +1,4 @@
-from typing import  Dict
+from typing import  Dict, List
 from sglang import function,user,assistant,system,gen
 import inflect
 @function
@@ -21,15 +21,26 @@ Extract entity in the singular form. Output all the extracted types of items in 
 class EntityExtractor:
     def __init__(self):
         self.singular_noun = inflect.engine().singular_noun
-    def extract_entity(self, sample: Dict):
-        extracted_entities = []
-        for sent in sample['split_sents']:
-            entity_str = self.get_res(sent)
-            extracted_entities.append(entity_str.strip('.'))
-        sample['named_entity'] = extracted_entities
-        return sample
+    def extract_batch_entity(self, samples: List[Dict]):
+        batch_sents = []
+        for sample in samples:
+            for sent in sample['split_sents']:
+                batch_sents.append(sent)
+        batch_entities = self.get_batch_res(batch_sents)
+        idx = 0
+        for sample in samples:
+            extracted_entities = []
+            for sent in sample['split_sents']:
+                extracted_entities.append(batch_entities[idx])
+                idx += 1
+            sample['named_entity'] = extracted_entities
+            
+        return samples
 
-    def get_res(self,sent: str,):
-        state = extractor.run({'sentence':sent},temperature=0,max_new_tokens=1024)
-        entities = [self.singular_noun(ent) if self.singular_noun(ent) else ent for ent in state['entities'].strip().split('.')]
-        return '.'.join(entities)
+    def get_batch_res(self,sent: List[str]):
+        states = extractor.run_batch([{'sentence':s} for s in sent],temperature=0,max_new_tokens=1024)
+        batch_entities = []
+        for state in states:
+            entities = [self.singular_noun(ent) if ent!='' and self.singular_noun(ent) else ent for ent in state['entities'].strip().split('.')]
+            batch_entities.append('.'.join(entities).strip('.'))
+        return batch_entities

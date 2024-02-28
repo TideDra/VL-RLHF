@@ -9,8 +9,6 @@ from models.refiner import SYS_MESSAGE as REF_SYS_MESSAGE
 from models.refiner import few_shot_examples as ref_few_shot_examples
 
 args = {
-    'api_key':"7a9bc8c30afc4ddebee73f30f032dee8",
-    'end_point':"https://testdeploy3.openai.azure.com/openai/deployments/gpt-35-turbo/chat/completions?api-version=2023-07-01-preview",
     'refiner_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
     'refiner_end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview",
     'val_model_endpoint': "http://localhost:30000",
@@ -33,7 +31,7 @@ def worker(device,corrector_args,job_queue,result_queue):
         refiner_examples = sample.pop('refiner_examples')
         corrector.refiner.few_shot_examples = refiner_examples
         corrector.refiner.sys_message = refiner_sys_message
-        result = corrector.correct(sample)
+        result = corrector.correct([sample])
         result_queue.put(result)
 
 def inference(img,text,query,refiner_sys_message,*refiner_examples):

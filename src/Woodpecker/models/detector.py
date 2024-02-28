@@ -1,6 +1,6 @@
 import os
 
-from typing import Dict
+from typing import Dict, List
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
@@ -84,7 +84,7 @@ def double_check(global_entity_dict, img_path):
     states = image_qa.run_batch(
         [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in maybe_entities],
         temperature=0,
-        max_new_tokens=32
+        max_new_tokens=16
     )
     for entity, state in zip(maybe_entities, states):
         if 'yes' in state['answer'].lower():
@@ -147,3 +147,8 @@ class Detector:
         sample['entity_info'] = global_entity_dict
         sample['entity_list'] = global_entity_list
         return sample
+
+    def detect_batch_objects(self,samples:List[Dict]):
+        for idx,sample in enumerate(samples):
+            samples[idx] = self.detect_objects(sample)
+        return samples

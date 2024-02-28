@@ -1,4 +1,4 @@
-from typing import  Dict
+from typing import  Dict, List
 import spacy
 import os
 from sglang import function,user,assistant,system,gen
@@ -36,17 +36,19 @@ class PreProcessor:
         split_sents = [sent.text.strip() for sent in split_sents]
         return split_sents
     
-    def generate_sentences(self, sample: Dict):
-        rewritten_passage = self.get_output(sample['input_desc'])
-        rew_split_sents = self.get_split_sents(rewritten_passage)
-        
-        orig_split_sents = self.get_split_sents(sample['input_desc'])
-        
-        sample['split_sents'] = rew_split_sents
-        sample['orig_split_sents'] = orig_split_sents
-        return sample
+    def generate_batch_sentences(self, batch_sample: List[Dict]):
+        batch_input_desc = [s['input_desc'] for s in batch_sample]
+        batch_reweitten_passage = self.get_batch_output(batch_input_desc)
+        for rewritten_passage, sample in zip(batch_reweitten_passage, batch_sample):
+            rew_split_sents = self.get_split_sents(rewritten_passage)
 
-    def get_output(self,text: str):
-        state = rewriter.run({'text':text},temperature=0,max_new_tokens=1024)
+            orig_split_sents = self.get_split_sents(sample['input_desc'])
 
-        return state['rewrite']
+            sample['split_sents'] = rew_split_sents
+            sample['orig_split_sents'] = orig_split_sents
+        return batch_sample
+
+    def get_batch_output(self,text: List[str]):
+        states = rewriter.run_batch([{'text':t} for t in text],temperature=0,max_new_tokens=1024)
+
+        return [s['rewrite'] for s in states]

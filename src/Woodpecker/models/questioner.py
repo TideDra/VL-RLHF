@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict,List
 from tqdm import tqdm
 import openai
 import time
@@ -97,35 +97,51 @@ class Questioner:
     
         self.nlp = spacy.load("en_core_web_sm")
         
-    def generate_questions(self, sample: Dict):
-        sentences = sample['split_sents']
-        global_entity_dict = sample['entity_info']
-        global_entity_list = sample['entity_list']
-        
+    def generate_batch_questions(self, samples: List[Dict]):
         qs_list = []
-        for ent_list, sent in zip(global_entity_list, sentences):
-            exist_entity = [ent for ent in ent_list if ent in global_entity_dict and global_entity_dict[ent]['total_count'] != 0]
-            
-            # border case: no detection result for any entity. no question asked.
-            if len(exist_entity)==0 :
-                qs_list.append([])
-                continue
-            
-            questions = self.get_res(self.nlp, '.'.join(exist_entity), sent)
-            qs_list.append(questions)
-        sample['generated_questions'] = qs_list
-        return sample
+        batch_entity = []
+        batch_sent = []
+        for sample in samples:
+            sentences = sample['split_sents']
+            global_entity_dict = sample['entity_info']
+            global_entity_list = sample['entity_list']
+
+            for ent_list, sent in zip(global_entity_list, sentences):
+                exist_entity = [ent for ent in ent_list if ent in global_entity_dict and global_entity_dict[ent]['total_count'] != 0]
+
+                # border case: no detection result for any entity. no question asked.
+                if len(exist_entity)==0 :
+                    qs_list.append([])
+                    continue
+                batch_entity.append('.'.join(exist_entity))
+                batch_sent.append(sent)
+                qs_list.append("placeholder")
+                
+        questions = self.get_batch_res(batch_entity, batch_sent)
+        questions_iter=iter(questions)
+        for idx,v in enumerate(qs_list):
+            if v == "placeholder":
+                qs_list[idx] = next(questions_iter)
+        idx = 0
+        for sample in samples:
+            sample['generated_questions'] = []
+            for sent in sample['split_sents']:
+                sample['generated_questions'].append(qs_list[idx])
+                idx += 1
+        return samples
     
-    def get_res(self,nlp, entity: str, sent: str):
+    def get_batch_res(self, batch_entity: List[str], batch_sent: List[str]):
 
-        state = questioner.run(sentence=sent, entity=entity,temperature=0,max_new_tokens=512)
+        states = questioner.run_batch([{"sentence":sent,"entity":entity} for sent,entity in zip(batch_entity,batch_sent)],temperature=0,max_new_tokens=512)
+        batch_res = []
+        for state,sent,entity in zip(states,batch_sent,batch_entity):
+            res = state['question'].splitlines()
+            res = [s.split('&') for s in res if s.lower() != 'none']
+            entity_list = entity.split('.')
 
-        res = state['question'].splitlines()
-        res = [s.split('&') for s in res if s.lower() != 'none']
-        entity_list = entity.split('.')
+            res = [s for s in res if len(s)==2]
+            res = remove_duplicates(res)
+            res = [s for s in res if set(s[1].replace('(single)','').replace('(multi)','').split('.')).issubset(set(entity_list)) ]
+            batch_res.append(res)
 
-        res = [s for s in res if len(s)==2]
-        res = remove_duplicates(res)
-        res = [s for s in res if set(s[1].replace('(single)','').replace('(multi)','').split('.')).issubset(set(entity_list)) ]
-
-        return res
+        return batch_res

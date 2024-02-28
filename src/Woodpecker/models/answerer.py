@@ -3,7 +3,7 @@ import os
 import torch
 from PIL import Image
 
-from typing import Dict
+from typing import Dict, List
 from .utils import image_qa
 
 def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
@@ -84,6 +84,11 @@ class Answerer:
         self.device = device
 
 
+    def generate_batch_answers(self, samples: List[Dict]):
+        for idx,sample in enumerate(samples):
+            samples[idx] = self.generate_answers(sample)
+        return samples
+    
     def generate_answers(self, sample: Dict):
         generated_qs = sample['generated_questions']
         global_entity_dict = sample['entity_info']

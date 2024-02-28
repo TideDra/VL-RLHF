@@ -62,6 +62,11 @@ class ClaimGenerator:
     def __init__(self, device='cuda'):
         self.device=device
 
+    def generate_batch_claim(self, samples: Dict):
+        for idx,sample in enumerate(samples):
+            samples[idx] = self.generate_claim(sample)
+        return samples
+
     def generate_claim(self, sample: Dict):
         # claim from two parts. counting info and Q&A
         all_claim = {}

@@ -15,13 +15,10 @@ import gc
 from sglang import set_default_backend, RuntimeEndpoint
 from sglang.utils import http_request
 class Corrector:
-    def __init__(self, api_key=None,end_point=None,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,device='cuda') -> None:
+    def __init__(self,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,device='cuda') -> None:
         # init all the model
-        self.chatbot = GPT(model='gpt-3.5-turbo',service=api_service,api_key=api_key,end_point=end_point,temperature=0.7)
-        if refiner_key is not None and refiner_end_point is not None:
-            self.refiner_chatbot = GPT(model='gpt-4',service=api_service,api_key=refiner_key,end_point=refiner_end_point,temperature=0.7)
-        else:
-            self.refiner_chatbot = self.chatbot
+
+        self.refiner_chatbot = GPT(model='gpt-4',service=api_service,api_key=refiner_key,end_point=refiner_end_point,temperature=0.7)
         self.runtime = RuntimeEndpoint(val_model_endpoint)
         set_default_backend(self.runtime)
         http_request(self.runtime.base_url+"/flush_cache")
@@ -36,32 +33,29 @@ class Corrector:
         print("Finish loading models.")
 
     
-    def correct(self, sample: Dict):
+    def correct(self, samples: List[Dict]):
+        assert isinstance(samples, list), f"Only support batch input with tpye List[Dict], but got {type(sample)}"
         '''
         sample is Dict containing at least two fields:
             'input_desc': A passage that contains a description of the image.
             'input_img': Path to a local image 
         '''
         print("start generating sentences...")
-        sample = self.preprocessor.generate_sentences(sample)
+        samples = self.preprocessor.generate_batch_sentences(samples)
         print("start extracting entities...")
-        sample = self.entity_extractor.extract_entity(sample)
+        samples = self.entity_extractor.extract_batch_entity(samples)
         print("start detecting objects...")
-        sample = self.detector.detect_objects(sample)
+        samples = self.detector.detect_batch_objects(samples)
         print("start generating questions...")
-        sample = self.questioner.generate_questions(sample)
+        samples = self.questioner.generate_batch_questions(samples)
         print("start generating answers...")
-        sample = self.answerer.generate_answers(sample)
+        samples = self.answerer.generate_batch_answers(samples)
         print("start generating claims...")
-        sample = self.claim_generator.generate_claim(sample)
+        samples = self.claim_generator.generate_batch_claim(samples)
         print("start refining...")
-        sample = self.refiner.generate_output(sample)
+        sample = self.refiner.generate_output(samples[0])
         print('done')
         os.system(f"rm -rf {self.cache_dir}")
         torch.cuda.empty_cache()
         gc.collect()
         return sample
-
-    def batch_correct(self, samples: List[Dict]):
-
-        return [self.correct(sample) for sample in tqdm(samples, total=len(samples))]
