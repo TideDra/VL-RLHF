@@ -10,3 +10,4 @@ ckpts
 .vscode
 *.pth
 *.egg-info
+cache_dir/
