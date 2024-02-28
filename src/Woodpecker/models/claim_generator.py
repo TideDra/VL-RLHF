@@ -20,13 +20,13 @@ Answer: No, the woman holding the drink in the red bounding box is far away from
     s += user(f"Question: {question}\nAnswer: {answer}")
     s += assistant("Summary: "+gen('claim'))
 
-def get_claim(question, answer):
+def get_claim(question, answer,endpoint):
     if isinstance(question, str):
         question = [question]
     if isinstance(answer, str):
         answer = [answer]
     assert len(question) == len(answer)
-    states = claimer.run_batch([{ 'question': q, 'answer': a} for q, a in zip(question, answer)],temperature=0,max_new_tokens=256)
+    states = claimer.run_batch([{ 'question': q, 'answer': a} for q, a in zip(question, answer)],temperature=0,max_new_tokens=256,backend=endpoint)
     return [s['claim'] for s in states]
 
 class ClaimGenerator:
@@ -58,9 +58,8 @@ class ClaimGenerator:
                             }
     '''
     
-    def __init__(self, device='cuda'):
-        self.device=device
-
+    def __init__(self, endpoint):
+        self.endpoint = endpoint
     def generate_batch_claim(self, samples: Dict):
         for idx,sample in enumerate(samples):
             samples[idx] = self.generate_claim(sample)
@@ -82,7 +81,7 @@ class ClaimGenerator:
                         qs, ans = qa_tuple
                         questions.append(qs)
                         answers.append(ans)
-                    clm = get_claim(questions, answers)
+                    clm = get_claim(questions, answers,self.endpoint)
                     all_claim['overall'] += clm
                 else:
                     all_claim.setdefault('specific', {}).setdefault(entity, [])
@@ -95,7 +94,7 @@ class ClaimGenerator:
                             qs, ans = qa_tuple
                             questions.append(qs)
                             answers.append(ans)
-                        clm = get_claim(questions, answers)
+                        clm = get_claim(questions, answers,self.endpoint)
                         all_claim['specific'][entity][idx] += clm
                            
         # second part, counting info

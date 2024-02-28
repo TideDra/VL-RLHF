@@ -73,7 +73,7 @@ def find_most_similar_strings(nlp, source_strings, target_strings):
     
     return result
 
-def double_check(global_entity_dict, img_path):
+def double_check(global_entity_dict, img_path,endpoint):
     maybe_entities = []
     for entity, info in global_entity_dict.items():
         if info['total_count'] == 0:
@@ -84,7 +84,8 @@ def double_check(global_entity_dict, img_path):
     states = image_qa.run_batch(
         [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in maybe_entities],
         temperature=0,
-        max_new_tokens=16
+        max_new_tokens=16,
+        backend=endpoint
     )
     for entity, state in zip(maybe_entities, states):
         if 'yes' in state['answer'].lower():
@@ -106,13 +107,13 @@ class Detector:
                         Note: if total_count > 1, may use the whole image in the following steps.
                 }
     '''
-    def __init__(self, detector_config,detector_model_path, cache_dir,device='cuda'):
+    def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,device='cuda'):
         
         self.device = device
-        self.model = load_model(detector_config, detector_model_path, device='cuda')
+        self.model = load_model(detector_config, detector_model_path, device=self.device)
         self.cache_dir = cache_dir
         self.nlp = spacy.load("en_core_web_md")
-        
+        self.endpoint = endpoint
     def detect_objects(self, sample: Dict):
         img_path = sample['img_path']
         extracted_entities = sample['named_entity']
@@ -143,7 +144,7 @@ class Detector:
             phrases = find_most_similar_strings(self.nlp, phrases, entity_list)    
             global_entity_dict = extract_detection(global_entity_dict, boxes, phrases, image_source, self.cache_dir, sample)
         
-        double_check(global_entity_dict, img_path)
+        double_check(global_entity_dict, img_path,self.endpoint)
         sample['entity_info'] = global_entity_dict
         sample['entity_list'] = global_entity_list
         return sample

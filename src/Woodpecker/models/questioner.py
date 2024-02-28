@@ -93,10 +93,10 @@ class Questioner:
             For each splitted sentences:
                 A list of 2-ele list: [[question, involved object type], [qs, obj], ...]         
     '''
-    def __init__(self):
+    def __init__(self,endpoint):
     
         self.nlp = spacy.load("en_core_web_sm")
-        
+        self.endpoint = endpoint
     def generate_batch_questions(self, samples: List[Dict]):
         qs_list = []
         batch_entity = []
@@ -132,7 +132,7 @@ class Questioner:
     
     def get_batch_res(self, batch_entity: List[str], batch_sent: List[str]):
 
-        states = questioner.run_batch([{"sentence":sent,"entity":entity} for sent,entity in zip(batch_entity,batch_sent)],temperature=0,max_new_tokens=512)
+        states = questioner.run_batch([{"sentence":sent,"entity":entity} for sent,entity in zip(batch_entity,batch_sent)],temperature=0,max_new_tokens=512,backend=self.endpoint)
         batch_res = []
         for state,sent,entity in zip(states,batch_sent,batch_entity):
             res = state['question'].splitlines()

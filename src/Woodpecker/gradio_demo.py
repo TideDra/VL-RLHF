@@ -12,6 +12,7 @@ args = {
     'refiner_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
     'refiner_end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview",
     'val_model_endpoint': "http://localhost:30000",
+    'chat_model_endpoint': "http://localhost:10011",
     #'qa2c_model_path': "/mnt/gozhang/ckpts/zerofec-qa2claim-t5-base",
     'detector_config': "./GroundingDINO_SwinT_OGC.py",
     'detector_model_path': "/mnt/gozhang/ckpts/groundingdino_swint_ogc.pth",

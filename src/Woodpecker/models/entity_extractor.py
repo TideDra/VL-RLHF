@@ -19,8 +19,9 @@ Extract entity in the singular form. Output all the extracted types of items in 
     s += assistant("Output:\n"+gen('entities'))
 
 class EntityExtractor:
-    def __init__(self):
+    def __init__(self,endpoint):
         self.singular_noun = inflect.engine().singular_noun
+        self.endpoint = endpoint
     def extract_batch_entity(self, samples: List[Dict]):
         batch_sents = []
         for sample in samples:
@@ -38,7 +39,7 @@ class EntityExtractor:
         return samples
 
     def get_batch_res(self,sent: List[str]):
-        states = extractor.run_batch([{'sentence':s} for s in sent],temperature=0,max_new_tokens=1024)
+        states = extractor.run_batch([{'sentence':s} for s in sent],temperature=0,max_new_tokens=1024,backend=self.endpoint)
         batch_entities = []
         for state in states:
             entities = [self.singular_noun(ent) if ent!='' and self.singular_noun(ent) else ent for ent in state['entities'].strip().split('.')]

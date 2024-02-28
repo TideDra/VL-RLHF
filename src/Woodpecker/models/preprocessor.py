@@ -21,7 +21,7 @@ The modification should be as small as possible, and the output passage should h
 
 class PreProcessor:
     
-    def __init__(self):
+    def __init__(self,endpoint):
         try:
             self.nlp = spacy.load('en_core_web_lg')
         except:
@@ -29,7 +29,7 @@ class PreProcessor:
             os.system("python -m spacy download en_core_web_md")
             os.system("python -m spacy download en_core_web_sm")
             self.nlp = spacy.load('en_core_web_lg')
-
+        self.endpoint = endpoint
     def get_split_sents(self, passage):
         doc = self.nlp(passage)
         split_sents = list(doc.sents)
@@ -49,6 +49,6 @@ class PreProcessor:
         return batch_sample
 
     def get_batch_output(self,text: List[str]):
-        states = rewriter.run_batch([{'text':t} for t in text],temperature=0,max_new_tokens=1024)
+        states = rewriter.run_batch([{'text':t} for t in text],temperature=0,max_new_tokens=1024,backend=self.endpoint)
 
         return [s['rewrite'] for s in states]

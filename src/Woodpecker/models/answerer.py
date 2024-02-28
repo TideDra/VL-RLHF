@@ -19,12 +19,13 @@ def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
     else:
         return batch[(raw_img_path,img_path,qs)].get('output', None)
 
-def process_batch(batch):
+def process_batch(batch,endpoint):
 
     states = image_qa.run_batch(
         [{"image_path":v['img_path'],"question":v['prompt']} for v in batch.values()],
         temperature=0,
-        max_new_tokens=256
+        max_new_tokens=256,
+        backend=endpoint
         )
     for k,s in zip(batch.keys(),states):
         batch[k]['output'] = s['answer']
@@ -80,9 +81,8 @@ class Answerer:
                                 }
     '''
     
-    def __init__(self, device='cuda'):
-        self.device = device
-
+    def __init__(self,endpoint):
+        self.endpoint = endpoint
 
     def generate_batch_answers(self, samples: List[Dict]):
         for idx,sample in enumerate(samples):
@@ -113,7 +113,7 @@ class Answerer:
                 cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch,is_multi)
             all_answers.append(cur_answers)
 
-        process_batch(batch)
+        process_batch(batch,self.endpoint)
         all_answers = []
         for gen_qs in generated_qs:
             # border case: no question asked.

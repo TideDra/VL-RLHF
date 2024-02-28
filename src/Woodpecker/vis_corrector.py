@@ -15,19 +15,21 @@ import gc
 from sglang import set_default_backend, RuntimeEndpoint
 from sglang.utils import http_request
 class Corrector:
-    def __init__(self,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,device='cuda') -> None:
+    def __init__(self,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,device='cuda') -> None:
         # init all the model
 
         self.refiner_chatbot = GPT(model='gpt-4',service=api_service,api_key=refiner_key,end_point=refiner_end_point,temperature=0.7)
-        self.runtime = RuntimeEndpoint(val_model_endpoint)
-        set_default_backend(self.runtime)
-        http_request(self.runtime.base_url+"/flush_cache")
-        self.preprocessor = PreProcessor()
-        self.entity_extractor = EntityExtractor()
-        self.detector = Detector(detector_config,detector_model_path,cache_dir,device=device)
-        self.questioner = Questioner()
-        self.answerer = Answerer(device=device)
-        self.claim_generator = ClaimGenerator(device=device)
+        self.val_runtime = RuntimeEndpoint(val_model_endpoint)
+        if chat_model_endpoint is not None:
+            self.chat_runtime = RuntimeEndpoint(chat_model_endpoint)
+            http_request(self.chat_runtime.base_url+"/flush_cache")
+        http_request(self.val_runtime.base_url+"/flush_cache")
+        self.preprocessor = PreProcessor(self.chat_runtime)
+        self.entity_extractor = EntityExtractor(self.chat_runtime)
+        self.detector = Detector(detector_config,detector_model_path,cache_dir,self.val_runtime,device=device)
+        self.questioner = Questioner(self.chat_runtime)
+        self.answerer = Answerer(self.val_runtime)
+        self.claim_generator = ClaimGenerator(self.chat_runtime)
         self.refiner = Refiner(self.refiner_chatbot)
         self.cache_dir = cache_dir
         print("Finish loading models.")
