@@ -9,7 +9,7 @@ from .utils import image_qa
 def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
     if batch.get((raw_img_path,img_path,qs), None) is None:
         if img_path is not None:
-            new_qs = f"Focus on the region annotated by the red bounding box in this image, {qs}"
+            new_qs = f"Focus on the region annotated by the red bounding box in this image, {qs} Give me a short answer."
             prompt = new_qs
             batch[(raw_img_path,img_path,qs)] = {'prompt': prompt, 'img_path':img_path}
         else:
