@@ -9,16 +9,16 @@ from tqdm import tqdm
 from typing import List, Dict
 import time
 import os
-from GPTFactory import GPT
+from GPTFactory import GPT,smart_build_factory
 import torch
 import gc
 from sglang import set_default_backend, RuntimeEndpoint
 from sglang.utils import http_request
 class Corrector:
-    def __init__(self,refiner_key=None,refiner_end_point=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,device='cuda') -> None:
+    def __init__(self,api_info=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,device='cuda') -> None:
         # init all the model
 
-        self.refiner_chatbot = GPT(model='gpt-4',service=api_service,api_key=refiner_key,end_point=refiner_end_point,temperature=0.7)
+        self.refiner_factory = smart_build_factory(api_info,model="gpt-4",service=api_service,worker_num=8,tpm=4e4,rpm=240,temperature=0.01)
         self.val_runtime = RuntimeEndpoint(val_model_endpoint)
         if chat_model_endpoint is not None:
             self.chat_runtime = RuntimeEndpoint(chat_model_endpoint)
@@ -30,13 +30,13 @@ class Corrector:
         self.questioner = Questioner(self.chat_runtime)
         self.answerer = Answerer(self.val_runtime)
         self.claim_generator = ClaimGenerator(self.chat_runtime)
-        self.refiner = Refiner(self.refiner_chatbot)
+        self.refiner = Refiner(self.refiner_factory)
         self.cache_dir = cache_dir
         print("Finish loading models.")
 
     
     def correct(self, samples: List[Dict]):
-        assert isinstance(samples, list), f"Only support batch input with tpye List[Dict], but got {type(sample)}"
+        assert isinstance(samples, list), f"Only support batch input with tpye List[Dict], but got {type(samples)}"
         '''
         sample is Dict containing at least two fields:
             'input_desc': A passage that contains a description of the image.
@@ -55,9 +55,9 @@ class Corrector:
         print("start generating claims...")
         samples = self.claim_generator.generate_batch_claim(samples)
         print("start refining...")
-        sample = self.refiner.generate_output(samples[0])
+        samples = self.refiner.generate_batch_output(samples)
         print('done')
         os.system(f"rm -rf {self.cache_dir}")
         torch.cuda.empty_cache()
         gc.collect()
-        return sample
+        return samples

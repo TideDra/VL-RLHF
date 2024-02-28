@@ -9,8 +9,10 @@ from models.refiner import SYS_MESSAGE as REF_SYS_MESSAGE
 from models.refiner import few_shot_examples as ref_few_shot_examples
 
 args = {
-    'refiner_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
-    'refiner_end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview",
+    'api_info':[{
+                    'api_key': "05d739b8fe5141699aa0ab8b8cdacfa2",
+                    'end_point':"https://test-gpt-api-switzerlan-north.openai.azure.com/openai/deployments/gpt-4/chat/completions?api-version=2023-07-01-preview"
+                }],
     'val_model_endpoint': "http://localhost:30000",
     'chat_model_endpoint': "http://localhost:10011",
     #'qa2c_model_path': "/mnt/gozhang/ckpts/zerofec-qa2claim-t5-base",
@@ -33,7 +35,7 @@ def worker(device,corrector_args,job_queue,result_queue):
         corrector.refiner.few_shot_examples = refiner_examples
         corrector.refiner.sys_message = refiner_sys_message
         result = corrector.correct([sample])
-        result_queue.put(result)
+        result_queue.put(result[0])
 
 def inference(img,text,query,refiner_sys_message,*refiner_examples):
     new_few_shot_examples = deepcopy(ref_few_shot_examples)

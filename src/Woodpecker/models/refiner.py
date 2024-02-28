@@ -1,9 +1,9 @@
-from typing import  Dict
+from typing import  Dict, List
 import spacy
 import openai
 import time
 from tqdm import tqdm
-
+from GPTFactory import GPTFactory
 NUM_SECONDS_TO_SLEEP = 0.3
 SYS_MESSAGE='''Given a query, a passage and some supplementary information, you are required to correct and output the refined passage in a fluent and natural style, following these rules:
 1. The supplementary information may include some of the following parts:
@@ -355,51 +355,58 @@ class Refiner:
                 'output' : Final output, a refined passage.
     '''
     
-    def __init__(self, chatbot):
+    def __init__(self, factory:GPTFactory):
 
-        self.chatbot = chatbot
+        self.factory = factory
         self.few_shot_examples = few_shot_examples
         self.sys_message = SYS_MESSAGE
-    def generate_output(self, sample: Dict):
-        all_claim = sample['claim']
-        global_entity_dict = sample['entity_info']
-        ent_aliases = sample['ent_aliases']
-        # three parts: counting, specific, overall
-        sup_info = ""
-        # add counting info.
-        sup_info += all_claim['counting']
-        
-        # add specific info.
-        if 'specific' in all_claim and len(all_claim['specific']) > 0:
-            sup_info += "Specific:\n"
-            specific_claim_list = []
-            for entity, instance_claim in all_claim['specific'].items():
-                cur_entity_claim_list = []
-                for idx, instance_claim_list in enumerate(instance_claim):
-                    cur_inst_bbox = global_entity_dict[entity]['bbox'][idx]
-                    ent_name = f"{entity} {idx + 1}"
-                    ent_alias = ', '.join(sorted(ent_aliases[ent_name]))
-                    if len(ent_aliases[ent_name]) == 1:
-                        final_name = ent_alias
-                    else:
-                        final_name = f"({ent_alias})"
-                    cur_entity_claim_list.append(f"{final_name}: " + ' '.join(instance_claim_list))
-                specific_claim_list.append('\n'.join(cur_entity_claim_list))
-            sup_info += '\n'.join(specific_claim_list)
-            sup_info += '\n\n'
-            
-        # add overall info.
-        if 'overall' in all_claim and len(all_claim['overall']) > 0:
-            sup_info += "Overall:\n"
-            sup_info += '\n'.join(all_claim['overall'])
-            sup_info += '\n\n'
-            
-        sample['output'] = self.get_output(sample['query'], sample['input_desc'], sup_info)
-        return sample
 
-    def get_output(self,query: str, text: str, sup_info: str):
-        content = self.few_shot_examples+[{'role':'user','content':PROMPT_TEMPLATE.format(query=query, sup_info=sup_info, text=text)}]
+    def generate_batch_output(self, samples: List[Dict]):
+        batch_inputs = []
+        for sample in samples:
+            all_claim = sample['claim']
+            global_entity_dict = sample['entity_info']
+            ent_aliases = sample['ent_aliases']
+            # three parts: counting, specific, overall
+            sup_info = ""
+            # add counting info.
+            sup_info += all_claim['counting']
 
-        response = self.chatbot.complete(content,system_message=self.sys_message)
+            # add specific info.
+            if 'specific' in all_claim and len(all_claim['specific']) > 0:
+                sup_info += "Specific:\n"
+                specific_claim_list = []
+                for entity, instance_claim in all_claim['specific'].items():
+                    cur_entity_claim_list = []
+                    for idx, instance_claim_list in enumerate(instance_claim):
+                        cur_inst_bbox = global_entity_dict[entity]['bbox'][idx]
+                        ent_name = f"{entity} {idx + 1}"
+                        ent_alias = ', '.join(sorted(ent_aliases[ent_name]))
+                        if len(ent_aliases[ent_name]) == 1:
+                            final_name = ent_alias
+                        else:
+                            final_name = f"({ent_alias})"
+                        cur_entity_claim_list.append(f"{final_name}: " + ' '.join(instance_claim_list))
+                    specific_claim_list.append('\n'.join(cur_entity_claim_list))
+                sup_info += '\n'.join(specific_claim_list)
+                sup_info += '\n\n'
 
-        return response
+            # add overall info.
+            if 'overall' in all_claim and len(all_claim['overall']) > 0:
+                sup_info += "Overall:\n"
+                sup_info += '\n'.join(all_claim['overall'])
+                sup_info += '\n\n'
+            batch_inputs.append({'query': sample['query'], 'input_desc': sample['input_desc'], 'sup_info': sup_info})
+        batch_outputs = self.batch_refining(batch_inputs)
+        for output,sample in zip(batch_outputs,samples):
+            sample['output'] = output
+        return samples
+
+    def batch_refining(self,batch_inputs: List[Dict]):
+        batch_contents = []
+        for idx,input in enumerate(batch_inputs):
+            content = self.few_shot_examples+[{'role':'user','content':PROMPT_TEMPLATE.format(query=input['query'], sup_info=input['sup_info'], text=input['input_desc'])}]
+            batch_contents.append({'prompt':content,'system_message':self.sys_message,'id':idx})
+        results = self.factory.run_task(batch_contents)
+        results.sort(key=lambda x:x.id)
+        return [res.response for res in results]
