@@ -5,7 +5,6 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from models.utils import compute_iou
 import torch
 from sglang import function,user,assistant,system,gen
-
 @function
 def claimer(s,question,answer):
     s += system("You are an AI assistant that helps to summarize facts from given QA pairs. The summary should only contain facts related to the question, and you should ignore other facts unrelated to the question. The answer may mention a red bounding box, you should ignore the bounding box and do not mention it in the summary.")
@@ -124,7 +123,7 @@ class ClaimGenerator:
                 counting_claim += f"There is no {entity}.\n"
                 continue
             else:
-                counting_claim += f"There are {ent_counts} {entity}.\n"
+                counting_claim += f"There {'are' if ent_counts>1 else 'is' } {ent_counts} {entity}.\n"
                 box_claim_list = []
                 for idx, bbox in enumerate(ent_info['bbox']):
                     ent_name = f"{entity} {idx+1}"
