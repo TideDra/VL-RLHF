@@ -18,11 +18,13 @@ class Corrector:
     def __init__(self,api_info=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,device='cuda') -> None:
         # init all the model
 
-        self.refiner_factory = smart_build_factory(api_info,model="gpt-4",service=api_service,worker_num=8,tpm=4e4,rpm=240,temperature=0.01)
+        self.refiner_factory = smart_build_factory(api_info,model="gpt-4",service=api_service,worker_num=32,tpm=8e4,rpm=480,temperature=0.01)
         self.val_runtime = RuntimeEndpoint(val_model_endpoint)
         if chat_model_endpoint is not None:
             self.chat_runtime = RuntimeEndpoint(chat_model_endpoint)
             http_request(self.chat_runtime.base_url+"/flush_cache")
+        else:
+            self.chat_runtime = self.val_runtime
         http_request(self.val_runtime.base_url+"/flush_cache")
         self.preprocessor = PreProcessor(self.chat_runtime)
         self.entity_extractor = EntityExtractor(self.chat_runtime)
@@ -40,23 +42,24 @@ class Corrector:
         '''
         sample is Dict containing at least two fields:
             'input_desc': A passage that contains a description of the image.
-            'input_img': Path to a local image 
+            'img_path': Path to a local image 
+            'query': Query of the input_desc
         '''
-        print("start generating sentences...")
+        print('preprocessing...')
         samples = self.preprocessor.generate_batch_sentences(samples)
-        print("start extracting entities...")
+        print('extracting entities...')
         samples = self.entity_extractor.extract_batch_entity(samples)
-        print("start detecting objects...")
+        print('detecting objects...')
         samples = self.detector.detect_batch_objects(samples)
-        print("start generating questions...")
+        print('generating questions...')
         samples = self.questioner.generate_batch_questions(samples)
-        print("start generating answers...")
+        print('generating answers...')
         samples = self.answerer.generate_batch_answers(samples)
-        print("start generating claims...")
+        print('generating claims...')
         samples = self.claim_generator.generate_batch_claim(samples)
-        print("start refining...")
+        print('refining...')
         samples = self.refiner.generate_batch_output(samples)
-        print('done')
+
         os.system(f"rm -rf {self.cache_dir}")
         torch.cuda.empty_cache()
         gc.collect()

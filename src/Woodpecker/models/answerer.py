@@ -5,7 +5,7 @@ from PIL import Image
 
 from typing import Dict, List
 from .utils import image_qa
-
+from sglang.utils import http_request
 def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
     if batch.get((raw_img_path,img_path,qs), None) is None:
         if img_path is not None:
@@ -20,15 +20,21 @@ def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
         return batch[(raw_img_path,img_path,qs)].get('output', None)
 
 def process_batch(batch,endpoint):
-
-    states = image_qa.run_batch(
-        [{"image_path":v['img_path'],"question":v['prompt']} for v in batch.values()],
-        temperature=0,
-        max_new_tokens=256,
-        backend=endpoint
-        )
-    for k,s in zip(batch.keys(),states):
-        batch[k]['output'] = s['answer']
+    minibatch_size=32
+    minibatch = []
+    for idx, k in enumerate(batch.keys()):
+        minibatch.append({"image_path":batch[k]['img_path'],"question":batch[k]['prompt'],'k':k})
+        if len(minibatch) == minibatch_size or idx == len(batch)-1:
+            #http_request(endpoint.base_url+"/flush_cache")
+            states = image_qa.run_batch(
+                [{"image_path":v['image_path'],"question":v['question']} for v in minibatch],
+                temperature=0,
+                max_new_tokens=64,
+                backend=endpoint
+                )
+            for sample,s in zip(minibatch,states):
+                batch[sample['k']]['output'] = s['answer']
+            minibatch = []
 
 
 def get_all_answers(entity_list, qs, ent_info, input_img_path, cur_answers,batch,is_multi):
@@ -85,35 +91,20 @@ class Answerer:
         self.endpoint = endpoint
 
     def generate_batch_answers(self, samples: List[Dict]):
+        batch = {}
+        # prepare batch
         for idx,sample in enumerate(samples):
-            samples[idx] = self.generate_answers(sample)
+            samples[idx] = self.generate_answers(sample,batch)
+        process_batch(batch,self.endpoint)
+        # assign value
+        for idx,sample in enumerate(samples):
+            samples[idx] = self.generate_answers(sample,batch)
         return samples
     
-    def generate_answers(self, sample: Dict):
+    def generate_answers(self, sample: Dict,batch):
         generated_qs = sample['generated_questions']
         global_entity_dict = sample['entity_info']
         # prepare batch
-        batch = {}
-        all_answers = []
-        for gen_qs in generated_qs:
-            # border case: no question asked.
-            if len(gen_qs) == 0:
-                all_answers.append({})
-                continue
-            cur_answers = {}
-            for cur_qs in gen_qs:
-                qs, entity = cur_qs # qs is a str. entity is also a str. may contain multiple entity connected by periods.
-                is_multi = False
-                if '(multi)' in entity:
-                    is_multi = True
-
-                entity_list = entity.replace('(multi)','').replace('(single)','').split('.')
-                entity_list = [e.strip() for e in entity_list if e.strip()]
-                
-                cur_answers = get_all_answers(entity_list, qs, global_entity_dict, sample['img_path'], cur_answers,batch,is_multi)
-            all_answers.append(cur_answers)
-
-        process_batch(batch,self.endpoint)
         all_answers = []
         for gen_qs in generated_qs:
             # border case: no question asked.

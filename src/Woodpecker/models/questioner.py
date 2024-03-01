@@ -116,7 +116,6 @@ class Questioner:
                 batch_entity.append('.'.join(exist_entity))
                 batch_sent.append(sent)
                 qs_list.append("placeholder")
-                
         questions = self.get_batch_res(batch_entity, batch_sent)
         questions_iter=iter(questions)
         for idx,v in enumerate(qs_list):
@@ -125,7 +124,9 @@ class Questioner:
         idx = 0
         for sample in samples:
             sample['generated_questions'] = []
-            for sent in sample['split_sents']:
+            sentences = sample['split_sents']
+            global_entity_list = sample['entity_list']
+            for ent_list, sent in zip(global_entity_list, sentences):
                 sample['generated_questions'].append(qs_list[idx])
                 idx += 1
         return samples

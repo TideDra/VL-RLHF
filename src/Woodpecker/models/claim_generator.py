@@ -1,7 +1,6 @@
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"]="6"
 from typing import Dict
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from models.utils import compute_iou
 import torch
 from sglang import function,user,assistant,system,gen
@@ -20,14 +19,34 @@ Answer: No, the woman holding the drink in the red bounding box is far away from
     s += user(f"Question: {question}\nAnswer: {answer}")
     s += assistant("Summary: "+gen('claim'))
 
-def get_claim(question, answer,endpoint):
+def get_claim_or_prepare(question, answer,batch):
     if isinstance(question, str):
         question = [question]
     if isinstance(answer, str):
         answer = [answer]
     assert len(question) == len(answer)
-    states = claimer.run_batch([{ 'question': q, 'answer': a} for q, a in zip(question, answer)],temperature=0,max_new_tokens=256,backend=endpoint)
-    return [s['claim'] for s in states]
+    key = str((question,answer))
+    if key in batch:
+        return batch[key]['output']
+    else:
+        batch[key] = {'input':(question,answer),'output':[]}
+        return []
+
+def process_batch(batch,endpoint):
+    flatten_batch = []
+    for k in batch.keys():
+        q_list = batch[k]['input'][0]
+        a_list = batch[k]['input'][1]
+        for q,a in zip(q_list,a_list):
+            flatten_batch.append(dict(question=q,answer=a))
+    states = claimer.run_batch(flatten_batch,temperature=0,max_new_tokens=256,backend=endpoint)
+    state_iter = iter(states)
+    for k in batch.keys():
+        output = []
+        q_list = batch[k]['input'][0]
+        for _ in q_list:
+            output.append(next(state_iter)['claim'])
+        batch[k]['output'] = output
 
 class ClaimGenerator:
     '''
@@ -61,11 +80,18 @@ class ClaimGenerator:
     def __init__(self, endpoint):
         self.endpoint = endpoint
     def generate_batch_claim(self, samples: Dict):
+        batch = {}
+        # warm up batch
         for idx,sample in enumerate(samples):
-            samples[idx] = self.generate_claim(sample)
+            samples[idx] = self.generate_claim(sample,batch)
+
+        process_batch(batch,self.endpoint)
+        # assign value
+        for idx,sample in enumerate(samples):
+            samples[idx] = self.generate_claim(sample,batch)
         return samples
 
-    def generate_claim(self, sample: Dict):
+    def generate_claim(self, sample: Dict,batch):
         # claim from two parts. counting info and Q&A
         all_claim = {}
         
@@ -81,7 +107,7 @@ class ClaimGenerator:
                         qs, ans = qa_tuple
                         questions.append(qs)
                         answers.append(ans)
-                    clm = get_claim(questions, answers,self.endpoint)
+                    clm = get_claim_or_prepare(questions, answers,batch)
                     all_claim['overall'] += clm
                 else:
                     all_claim.setdefault('specific', {}).setdefault(entity, [])
@@ -94,7 +120,7 @@ class ClaimGenerator:
                             qs, ans = qa_tuple
                             questions.append(qs)
                             answers.append(ans)
-                        clm = get_claim(questions, answers,self.endpoint)
+                        clm = get_claim_or_prepare(questions, answers,batch)
                         all_claim['specific'][entity][idx] += clm
                            
         # second part, counting info

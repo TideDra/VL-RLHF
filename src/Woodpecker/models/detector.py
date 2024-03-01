@@ -13,6 +13,7 @@ from groundingdino.util.inference import load_model, load_image, predict
 from PIL import Image, ImageDraw
 import spacy
 from .utils import image_qa
+import gc
 
 BOX_TRESHOLD = 0.35     # used in detector api.
 TEXT_TRESHOLD = 0.25    # used in detector api.
@@ -73,23 +74,35 @@ def find_most_similar_strings(nlp, source_strings, target_strings):
     
     return result
 
-def double_check(global_entity_dict, img_path,endpoint):
+def double_check(samples,endpoint):
     maybe_entities = []
-    for entity, info in global_entity_dict.items():
-        if info['total_count'] == 0:
-            maybe_entities.append({
-                'image_path': img_path,
-                'entity':entity
-            })
+    for sample in samples:
+        global_entity_dict = sample['entity_info']
+        img_path = sample['img_path']
+    
+        for entity, info in global_entity_dict.items():
+            if info['total_count'] == 0:
+                maybe_entities.append({
+                    'image_path': img_path,
+                    'entity':entity
+                })
     states = image_qa.run_batch(
         [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in maybe_entities],
         temperature=0,
         max_new_tokens=16,
         backend=endpoint
     )
-    for entity, state in zip(maybe_entities, states):
-        if 'yes' in state['answer'].lower():
-            global_entity_dict[entity['entity']]['total_count'] = "unknown"
+    states_iter = iter(states)
+    for sample in samples:
+        global_entity_dict = sample['entity_info']
+        img_path = sample['img_path']
+    
+        for entity, info in global_entity_dict.items():
+            if info['total_count'] == 0:
+                state = next(states_iter)
+                answer = state['answer']
+                if "yes" in answer.lower():
+                    global_entity_dict[entity]['total_count'] = 'unknown'
 
 class Detector:
     '''
@@ -141,10 +154,12 @@ class Detector:
                 text_threshold=TEXT_TRESHOLD,
                 device=self.device
             )
+            torch.cuda.empty_cache()
+            gc.collect()
             phrases = find_most_similar_strings(self.nlp, phrases, entity_list)    
             global_entity_dict = extract_detection(global_entity_dict, boxes, phrases, image_source, self.cache_dir, sample)
         
-        double_check(global_entity_dict, img_path,self.endpoint)
+        #double_check(global_entity_dict, img_path,self.endpoint)
         sample['entity_info'] = global_entity_dict
         sample['entity_list'] = global_entity_list
         return sample
@@ -152,4 +167,5 @@ class Detector:
     def detect_batch_objects(self,samples:List[Dict]):
         for idx,sample in enumerate(samples):
             samples[idx] = self.detect_objects(sample)
+        double_check(samples,self.endpoint)
         return samples
