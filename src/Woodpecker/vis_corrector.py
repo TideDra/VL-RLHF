@@ -50,6 +50,7 @@ class Corrector:
         print('extracting entities...')
         samples = self.entity_extractor.extract_batch_entity(samples)
         print('detecting objects...')
+        http_request(self.val_runtime.base_url+"/flush_cache")
         samples = self.detector.detect_batch_objects(samples)
         print('generating questions...')
         samples = self.questioner.generate_batch_questions(samples)
