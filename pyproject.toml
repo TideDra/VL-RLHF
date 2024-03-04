@@ -9,7 +9,6 @@ dependencies = [
     "numpy",
     "loguru",
     "torch",
-    "torchvision",
     "transformers",
     "peft",
     "deepspeed",
@@ -46,7 +45,8 @@ extra = [
     "sglang[all]",
     "gradio",
     "openai",
-    "inflect"
+    "inflect",
+    "vllm==0.3.2"
 ]
 
 [tool.setuptools.packages.find]
