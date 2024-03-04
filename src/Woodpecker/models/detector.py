@@ -86,12 +86,17 @@ def double_check(samples,endpoint):
                     'image_path': img_path,
                     'entity':entity
                 })
-    states = image_qa.run_batch(
-        [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in maybe_entities],
-        temperature=0,
-        max_new_tokens=16,
-        backend=endpoint
-    )
+    mini_batchsize=16
+    states = []
+    for i in range(0, len(maybe_entities), mini_batchsize):
+        mini_batch = maybe_entities[i:min(i+mini_batchsize,len(maybe_entities))]
+
+        states.extend(image_qa.run_batch(
+            [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in mini_batch],
+            temperature=0,
+            max_new_tokens=16,
+            backend=endpoint
+        ))
     states_iter = iter(states)
     for sample in samples:
         global_entity_dict = sample['entity_info']
