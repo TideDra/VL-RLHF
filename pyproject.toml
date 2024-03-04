@@ -51,4 +51,4 @@ extra = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-exclude = ["Woodpecker","*egg-info"]
+exclude = ["Woodpecker","*egg-info","hdbench"]
