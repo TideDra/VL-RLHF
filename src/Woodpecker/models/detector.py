@@ -1,22 +1,19 @@
 import os
 
 from typing import Dict, List
-from tqdm import tqdm
-from PIL import Image
 import numpy as np
-from collections import defaultdict
+
 import shortuuid
-from torchvision.ops import box_convert
+
 import torch
 from .utils import compute_iou
-from groundingdino.util.inference import load_model, load_image, predict
+from mmdet.apis import DetInferencer
+from mmcv import imread
 from PIL import Image, ImageDraw
-import spacy
 from .utils import image_qa
 import gc
 
-BOX_TRESHOLD = 0.35     # used in detector api.
-TEXT_TRESHOLD = 0.25    # used in detector api.
+SCORE_THRESHOLD = 0.3    # used to filter out low-score object.
 AREA_THRESHOLD = 0.001   # used to filter out too small object.
 IOU_THRESHOLD = 0.95     # used to filter the same instance. greater than threshold means the same instance
 
@@ -31,8 +28,7 @@ def alreay_exist(detected_boxes, norm_box):
 def extract_detection(global_entity_dict, boxes, phrases, image_source, cache_dir, sample):
         
     h, w, _ = image_source.shape
-    boxes = boxes * torch.Tensor([w, h, w, h])
-    xyxy = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
+    xyxy = np.array(boxes)
     normed_xyxy = np.around(np.clip(xyxy / np.array([w, h, w, h]), 0., 1.), 3).tolist()
     
     os.makedirs(cache_dir, exist_ok=True)
@@ -50,7 +46,7 @@ def extract_detection(global_entity_dict, boxes, phrases, image_source, cache_di
         crop_id = shortuuid.uuid()
         image = Image.fromarray(image_source)
         draw = ImageDraw.Draw(image)
-        draw.rectangle(box, outline="red", width=4)
+        draw.rectangle(box.tolist(), outline="red", width=4)
         crop_path = os.path.join(cache_dir, f"{crop_id}.png")
         image.save(crop_path)
         
@@ -59,20 +55,6 @@ def extract_detection(global_entity_dict, boxes, phrases, image_source, cache_di
         global_entity_dict[entity]['bbox'].append(norm_box)    # [x1, y1, x2, y2] coordinate of left-top and right-bottom corner
         
     return global_entity_dict
-
-def find_most_similar_strings(nlp, source_strings, target_strings):
-    
-    target_docs = [nlp(text) for text in target_strings]
-
-    def find_most_similar(source_str):
-        source_doc = nlp(source_str)
-        similarities = [(target_doc, target_doc.similarity(source_doc)) for target_doc in target_docs]
-        most_similar_doc = max(similarities, key=lambda item: item[1])[0]
-        return most_similar_doc.text
-
-    result = [find_most_similar(source_str) for source_str in source_strings]
-    
-    return result
 
 def double_check(samples,endpoint,minibatch_size):
     maybe_entities = []
@@ -128,15 +110,14 @@ class Detector:
     def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,minibatch_size=16,device='cuda'):
         
         self.device = device
-        self.model = load_model(detector_config, detector_model_path, device=self.device)
+        self.model = DetInferencer(model=detector_config,weights=detector_model_path,device=device,palette='random')
         self.cache_dir = cache_dir
-        self.nlp = spacy.load("en_core_web_md")
         self.endpoint = endpoint
         self.minibatch_size = minibatch_size
     def detect_objects(self, sample: Dict):
         img_path = sample['img_path']
+        image_source = imread(img_path)
         extracted_entities = sample['named_entity']
-        image_source, image = load_image(img_path)
         
         global_entity_dict = {} # key=entity type name. value = {'total_count':int, 'crop_path':list, 'bbox':list of list(4-ele).}
         global_entity_list = [] # save all the entity type name for each sentence.
@@ -152,17 +133,19 @@ class Detector:
                 
             global_entity_list.append(entity_list)
         
-            boxes, logits, phrases = predict(
-                model=self.model,
-                image=image,
-                caption=entity_str,
-                box_threshold=sample['box_threshold'] if 'box_threshold' in sample else BOX_TRESHOLD,
-                text_threshold=TEXT_TRESHOLD,
-                device=self.device
-            )
+            predictions = self.model(img_path,texts=' . '.join(entity_list),custom_entities=True,pred_score_thr=SCORE_THRESHOLD)['predictions'][0]
+            phrases = []
+            boxes = []
+            for label,score,bbox in zip(predictions['labels'],predictions['scores'],predictions['bboxes']):
+                if score < SCORE_THRESHOLD:
+                    # score is sorted, so we can break here.
+                    break
+                phrases.append(entity_list[label])
+                boxes.append(bbox)
             torch.cuda.empty_cache()
-            gc.collect()
-            phrases = find_most_similar_strings(self.nlp, phrases, entity_list)    
+            gc.collect() 
+            if len(boxes) == 0:
+                continue
             global_entity_dict = extract_detection(global_entity_dict, boxes, phrases, image_source, self.cache_dir, sample)
         
         #double_check(global_entity_dict, img_path,self.endpoint)

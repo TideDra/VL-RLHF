@@ -28,7 +28,7 @@ class Corrector:
         self.minibatch_size = minibatch_size
         self.preprocessor = PreProcessor(self.chat_runtime)
         self.entity_extractor = EntityExtractor(self.chat_runtime)
-        self.detector = Detector(detector_config,detector_model_path,cache_dir,self.val_runtime,devices=devices,minibatch_size=minibatch_size)
+        self.detector = Detector(detector_config,detector_model_path,cache_dir,self.val_runtime,device=f'cuda:{devices[0]}',minibatch_size=minibatch_size)
         self.questioner = Questioner(self.chat_runtime)
         self.answerer = Answerer(self.val_runtime,minibatch_size=minibatch_size)
         self.claim_generator = ClaimGenerator(self.chat_runtime)

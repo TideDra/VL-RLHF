@@ -31,8 +31,8 @@ args = {
         "tp_size":2,
     },
     'chat_model_config': None,
-    'detector_config': "./GroundingDINO_SwinT_OGC.py",
-    'detector_model_path': "/mnt/gozhang/ckpts/groundingdino_swint_ogc.pth",
+    'detector_config': "./mmGD_config/grounding_dino_swin-t_pretrain_obj365.py",
+    'detector_model_path': "/mnt/gozhang/ckpts/grounding_dino_swin-t_pretrain_obj365_goldg_grit9m_v3det_20231204_095047-b448804b.pth",
     'cache_dir': "./cache_dir/",
     'api_service': "azure",
     'minibatch_size':16
@@ -95,3 +95,6 @@ if __name__ == "__main__":
     with open(result_file, "w") as f:
         json.dump(results, f)
     bar.close()
+    for p in pool_list:
+        p.terminate()
+        p.join()
