@@ -1,6 +1,8 @@
 from GPTFactory import smart_build_factory
 import json
 import re
+import os
+from argparse import ArgumentParser
 system_message = "You are an AI assistant good at understanding passages. You will be given a passage which may contain some factual mistakes marked with a pair of <f> and </f> tags, followed by the correction marked with a pair of <t> and </t> tags. The correction can be empty, which is expressed as '<t></t>', meaning the mistake should be safely deleted and no new content should be added. The mistakes and corrections are annotated by human, and this passage is noted as 'Human Annotated Passage'.\n You will be also given the same passage where the mistakes and corrections are annotated by another AI assistant, and this passage is noted as 'AI Annotated Passage'.\n Your task is to summarize and list the mistakes and the corresponding corrections of the two passages together. Each item contains a mistake and its annotator, as well as the corresponding corrections and their annotators.\n The annotator can only be 'Human','AI' or 'Human and AI' if both annotators agree on the mistake or the correction. If for the same mistake, the two annotator gives different corrections, you should just list the corrections and clarify the corresponding annotator. \nAn empty correction expressed by '<t></t>' should be written as '<Delete>'.\nNote that the same mistake or correction can be annotated in different ways by the two annotators, you should rely on the semantic meaning of the content to determine whether they are the same, in which case the annotator should be 'Human and AI'. It is possible that there is no mistake annotated by both of the two annotators, in which case you should only output 'No mistake found.'."
 few_shot_examples = [
     {
@@ -114,7 +116,11 @@ The image features a glass of red wine sitting next to an open box of pizza. The
     }
 ]
 
-with open('/mnt/gozhang/VL-RLHF/src/Woodpecker/results.json', 'r') as f:
+parser = ArgumentParser()
+parser.add_argument("--result-path", type=str, default='/mnt/gozhang/VL-RLHF/src/Woodpecker/results.json')
+args = parser.parse_args()
+
+with open(args.result_path, 'r') as f:
     predictions = json.load(f)
 
 api_info=[
@@ -185,5 +191,7 @@ print(f"Hallucination detection precision:{precision}")
 print(f"Hallucination detection recall:{recall}")
 print(f"Hallucination detection F1:{f1}")
 print(f"Hallucination correction precision:{overlap_corrections/overlap_mistakes}")
+os.makedirs('output',exist_ok=True)
+eval_result_name = "output/"+args.result_path.split('/')[-1].replace('.json','_eval.json')
 with open('eval_results.json', 'w') as f:
     json.dump(eval_results,f)
