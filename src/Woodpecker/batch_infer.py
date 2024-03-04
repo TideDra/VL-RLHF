@@ -33,7 +33,7 @@ args = {
 
 if __name__ == "__main__":
     corrector = Corrector(**args)
-    hdbench_path = "/mnt/gozhang/VL-RLHF/src/vlrlhf/eval/captioning/results/qwenvl_test2017.json"
+    hdbench_path = "/mnt/gozhang/VL-RLHF/src/hdbench/data/hdbench_cleaned.json"
     with open(hdbench_path, "r") as f:
         hdbench = json.load(f)
     batch_size=16
@@ -41,10 +41,10 @@ if __name__ == "__main__":
     bar = tqdm.tqdm(total=len(hdbench))
     for i in range(0, len(hdbench), batch_size):
         batch = hdbench[i:min(i+batch_size,len(hdbench))]
-        results = corrector.correct([{'img_path':os.path.join("/mnt/gozhang/VL-RLHF",s['image'][2:]),'input_desc':s['caption'],'query':"Describe this image in detail."} for s in batch])
-        with open(result_file, "a") as f:
-            for res in results:
-                f.write(json.dumps({"image": res["img_path"],"input":res["input_desc"] ,"output": res["output"]}))
-                f.write("\n")
+        results = corrector.correct([{'img_path':os.path.join("/mnt/gozhang/VL-RLHF/data_dir/",s['image']),'input_desc':s['caption'],'query':"Describe this image in detail."} for s in batch])
+        for sample,res in zip(batch,results):
+            sample['prediction'] = res['output']
         bar.update(len(results))
+    with open(result_file, "w") as f:
+        json.dump(hdbench, f)
     bar.close()
