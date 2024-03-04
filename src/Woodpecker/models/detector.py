@@ -74,7 +74,7 @@ def find_most_similar_strings(nlp, source_strings, target_strings):
     
     return result
 
-def double_check(samples,endpoint):
+def double_check(samples,endpoint,minibatch_size):
     maybe_entities = []
     for sample in samples:
         global_entity_dict = sample['entity_info']
@@ -86,10 +86,10 @@ def double_check(samples,endpoint):
                     'image_path': img_path,
                     'entity':entity
                 })
-    mini_batchsize=16
+
     states = []
-    for i in range(0, len(maybe_entities), mini_batchsize):
-        mini_batch = maybe_entities[i:min(i+mini_batchsize,len(maybe_entities))]
+    for i in range(0, len(maybe_entities), minibatch_size):
+        mini_batch = maybe_entities[i:min(i+minibatch_size,len(maybe_entities))]
 
         states.extend(image_qa.run_batch(
             [{"image_path":v['image_path'],"question":f"Is there any {v['entity']} in the image? Please answer yes or no."} for v in mini_batch],
@@ -125,13 +125,14 @@ class Detector:
                         Note: if total_count > 1, may use the whole image in the following steps.
                 }
     '''
-    def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,device='cuda'):
+    def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,minibatch_size=16,device='cuda'):
         
         self.device = device
         self.model = load_model(detector_config, detector_model_path, device=self.device)
         self.cache_dir = cache_dir
         self.nlp = spacy.load("en_core_web_md")
         self.endpoint = endpoint
+        self.minibatch_size = minibatch_size
     def detect_objects(self, sample: Dict):
         img_path = sample['img_path']
         extracted_entities = sample['named_entity']
@@ -172,5 +173,5 @@ class Detector:
     def detect_batch_objects(self,samples:List[Dict]):
         for idx,sample in enumerate(samples):
             samples[idx] = self.detect_objects(sample)
-        double_check(samples,self.endpoint)
+        double_check(samples,self.endpoint,self.minibatch_size)
         return samples

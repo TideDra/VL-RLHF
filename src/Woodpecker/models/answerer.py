@@ -19,8 +19,7 @@ def get_answer_or_prepare(raw_img_path,img_path, qs,batch):
     else:
         return batch[(raw_img_path,img_path,qs)].get('output', None)
 
-def process_batch(batch,endpoint):
-    minibatch_size=32
+def process_batch(batch,endpoint,minibatch_size):
     minibatch = []
     for idx, k in enumerate(batch.keys()):
         minibatch.append({"image_path":batch[k]['img_path'],"question":batch[k]['prompt'],'k':k})
@@ -87,15 +86,15 @@ class Answerer:
                                 }
     '''
     
-    def __init__(self,endpoint):
+    def __init__(self,endpoint,minibatch_size=16):
         self.endpoint = endpoint
-
+        self.minibatch_size = minibatch_size
     def generate_batch_answers(self, samples: List[Dict]):
         batch = {}
         # prepare batch
         for idx,sample in enumerate(samples):
             samples[idx] = self.generate_answers(sample,batch)
-        process_batch(batch,self.endpoint)
+        process_batch(batch,self.endpoint,self.minibatch_size)
         # assign value
         for idx,sample in enumerate(samples):
             samples[idx] = self.generate_answers(sample,batch)

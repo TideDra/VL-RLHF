@@ -15,7 +15,7 @@ import gc
 from sglang import set_default_backend, RuntimeEndpoint
 from sglang.utils import http_request
 class Corrector:
-    def __init__(self,api_info=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,device='cuda') -> None:
+    def __init__(self,api_info=None,api_service='azure',detector_config=None,detector_model_path=None,cache_dir=None,val_model_endpoint=None,chat_model_endpoint=None,minibatch_size=16,device='cuda') -> None:
         # init all the model
 
         self.refiner_factory = smart_build_factory(api_info,model="gpt-4",service=api_service,worker_num=32,tpm=8e4,rpm=480,temperature=0.01)
@@ -26,11 +26,12 @@ class Corrector:
         else:
             self.chat_runtime = self.val_runtime
         http_request(self.val_runtime.base_url+"/flush_cache")
+        self.minibatch_size = minibatch_size
         self.preprocessor = PreProcessor(self.chat_runtime)
         self.entity_extractor = EntityExtractor(self.chat_runtime)
-        self.detector = Detector(detector_config,detector_model_path,cache_dir,self.val_runtime,device=device)
+        self.detector = Detector(detector_config,detector_model_path,cache_dir,self.val_runtime,minibatch_size=minibatch_size,device=device)
         self.questioner = Questioner(self.chat_runtime)
-        self.answerer = Answerer(self.val_runtime)
+        self.answerer = Answerer(self.val_runtime,minibatch_size=minibatch_size)
         self.claim_generator = ClaimGenerator(self.chat_runtime)
         self.refiner = Refiner(self.refiner_factory)
         self.cache_dir = cache_dir
