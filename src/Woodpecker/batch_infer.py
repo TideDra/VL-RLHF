@@ -1,11 +1,12 @@
 from vis_corrector import Corrector
 from  multiprocessing import Process,Queue,set_start_method
-
+from GPTFactory import smart_build_factory
 import json
 import tqdm
 import os
 from copy import deepcopy
 from time import sleep
+from models.refiner import Refiner
 args = {
     'api_info':[
                     {
@@ -26,8 +27,8 @@ args = {
                     }
                 ],
     'val_model_config': {
-        "model_path":"/mnt/gozhang/ckpts/llava-v1.6-34b",
-        "tokenizer_path":"/mnt/gozhang/ckpts/llava-v1.6-34b-tokenizer",
+        "model_path":"/mnt/gozhang/ckpts/llava-v1.6-vicuna-13b",
+        "tokenizer_path":"/mnt/gozhang/ckpts/llava-v1.6-vicuna-13b-processor",
         "tp_size":2,
     },
     'chat_model_config': None,
@@ -47,14 +48,17 @@ def worker(device,corrector_args,job_queue,result_queue):
     result_queue.put("ready")
     while True:
         batch = job_queue.get()
+        if batch == 'stop':
+            corrector.shutdown()
+            break
         input_batch = [{'img_path':os.path.join("/mnt/gozhang/code/VL-RLHF/data_dir/",s['image']),'input_desc':s['caption'],'query':"Describe this image in detail."} for s in batch]
         try:
-            result = corrector.correct(input_batch)
+            result = corrector.correct_without_refiner(input_batch)
         except Exception as e:
             print(e)
             raise
         for sample,res in zip(batch,result):
-            sample['prediction'] = res['output']
+            sample['raw_sample'] = res
         result_queue.put(batch)
 
 if __name__ == "__main__":
@@ -62,11 +66,13 @@ if __name__ == "__main__":
         set_start_method('spawn')
     except:
         pass
+    refiner_factory = smart_build_factory(args['api_info'],model="gpt-4",service=args['api_service'],worker_num=32,tpm=8e4,rpm=480,temperature=0.01)
+    refiner = Refiner(refiner_factory)
     job_q = Queue()
     result_q = Queue()
     
     pool_list = []
-    gpu_num = 4
+    gpu_num = 8
     gpu_per_worker = 2
     assert gpu_num % gpu_per_worker == 0
     for i in range(0,gpu_num,gpu_per_worker):
@@ -80,7 +86,7 @@ if __name__ == "__main__":
     with open(hdbench_path, "r") as f:
         hdbench = json.load(f)
     batch_size=16
-    result_file = "llava1.6-34b_hdbench.json"
+    result_file = "llava1.6-vicuna13b_hdbench.json"
     bar = tqdm.tqdm(total=len(hdbench))
     for i in range(0, len(hdbench), batch_size):
         batch = hdbench[i:min(i+batch_size,len(hdbench))]
@@ -89,6 +95,10 @@ if __name__ == "__main__":
     results = []
     while len(results) < len(hdbench):
         result = result_q.get()
+        raw_samples = [res.pop('raw_sample') for res in result]
+        raw_samples = refiner.generate_batch_output(raw_samples)
+        for res,sample in zip(result,raw_samples):
+            res['prediction'] = sample['output']
         results.extend(result)
         bar.update(len(result))
 
@@ -96,5 +106,6 @@ if __name__ == "__main__":
         json.dump(results, f)
     bar.close()
     for p in pool_list:
+        job_q.put('stop')
         p.terminate()
         p.join()
