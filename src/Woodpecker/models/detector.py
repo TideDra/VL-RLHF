@@ -4,7 +4,7 @@ from typing import Dict, List
 import numpy as np
 
 import shortuuid
-
+from itertools import cycle
 import torch
 from .utils import compute_iou
 from mmdet.apis import DetInferencer
@@ -12,7 +12,7 @@ from mmcv import imread
 from PIL import Image, ImageDraw
 from .utils import image_qa
 import gc
-
+from threading import Thread,Lock
 SCORE_THRESHOLD = 0.3    # used to filter out low-score object.
 AREA_THRESHOLD = 0.001   # used to filter out too small object.
 IOU_THRESHOLD = 0.95     # used to filter the same instance. greater than threshold means the same instance
@@ -107,14 +107,28 @@ class Detector:
                         Note: if total_count > 1, may use the whole image in the following steps.
                 }
     '''
-    def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,minibatch_size=16,device='cuda'):
+    def __init__(self, detector_config,detector_model_path, cache_dir,endpoint,minibatch_size=16,devices='0,1'):
         
-        self.device = device
-        self.model = DetInferencer(model=detector_config,weights=detector_model_path,device=device,palette='random')
+        self.devices = devices.split(',')
+        self.model_pool = []
+        self.model_init_lock = Lock()
+        threads = []
+        for device in self.devices:
+            t = Thread(target=self.init_model_worker,args=(detector_config,detector_model_path,device))
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
         self.cache_dir = cache_dir
         self.endpoint = endpoint
         self.minibatch_size = minibatch_size
-    def detect_objects(self, sample: Dict):
+    
+    def init_model_worker(self,model,weights,device):
+        inferencer = DetInferencer(model=model,weights=weights,device=f'cuda:{device}',palette='random',show_progress=False)
+        with self.model_init_lock:
+            self.model_pool.append(inferencer)
+
+    def detect_objects(self, sample: Dict,device_idx:int):
         img_path = sample['img_path']
         image_source = imread(img_path)
         extracted_entities = sample['named_entity']
@@ -133,7 +147,7 @@ class Detector:
                 
             global_entity_list.append(entity_list)
         
-            predictions = self.model(img_path,texts=' . '.join(entity_list),custom_entities=True,pred_score_thr=SCORE_THRESHOLD)['predictions'][0]
+            predictions = self.model_pool[device_idx](img_path,texts=' . '.join(entity_list),custom_entities=True,pred_score_thr=SCORE_THRESHOLD)['predictions'][0]
             phrases = []
             boxes = []
             for label,score,bbox in zip(predictions['labels'],predictions['scores'],predictions['bboxes']):
@@ -153,8 +167,22 @@ class Detector:
         sample['entity_list'] = global_entity_list
         return sample
 
-    def detect_batch_objects(self,samples:List[Dict]):
+    def detect_objects_worker(self,samples:List[Dict],device_idx:int):
         for idx,sample in enumerate(samples):
-            samples[idx] = self.detect_objects(sample)
+            samples[idx] = self.detect_objects(sample,device_idx)
+
+    def detect_batch_objects(self,samples:List[Dict]):
+        device_num = len(self.devices)
+        tasks = [[]]*device_num
+        device_iter = cycle(range(device_num))
+        for sample in samples:
+            tasks[next(device_iter)].append(sample)
+        threads = []
+        for idx in range(device_num):
+            t = Thread(target=self.detect_objects_worker,args=(tasks[idx],idx))
+            threads.append(t)
+            t.start()
+        for t in threads:
+            t.join()
         double_check(samples,self.endpoint,self.minibatch_size)
         return samples
