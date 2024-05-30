@@ -1,0 +1,12 @@
+export SQL_HOST="localhost"
+export SQL_PORT=3306
+export SQL_USER="remote"
+export SQL_PASSWORD="zgr2002411"
+export SQL_DB="VLRLHF"
+export report_to_mysql=True
+export conda_path="~/miniconda3/bin/activate"
+export vlrlhf_env_name="vlrlhf"
+export vlmeval_env_name="vlmeval"
+export judger_path="ckpts/Qwen1.5-14B-Chat"
+export judger_port=23333
+export judger_tp=2

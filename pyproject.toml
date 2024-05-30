@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vlrlhf"
+version = "0.0.1"
+dependencies = [
+    "numpy",
+    "loguru",
+    "torch",
+    "torchvision",
+    "deepspeed",
+    "transformers==4.41.0",
+    "peft",
+    "trl == 0.8.1",
+    "einops",
+    "tiktoken",
+    "matplotlib",
+    "pillow",
+    "transformers_stream_generator",
+    "wandb",
+    "jsonlines",
+    "scikit-learn",
+    "pandas",
+    "pymysql",
+    "openpyxl",
+    "gradio_client",
+    "pre-commit"
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Geary Zhang", email = "gearyzhang@outlook.com"},
+]
+maintainers = [
+  {name = "Geary Zhang", email = "gearyzhang@outlook.com"},
+]
+description = "A RLHF Infrastructure for Vision-Language Model."
+keywords = ["pytorch","RLHF","VLM"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+exclude = ["*egg-info"]
