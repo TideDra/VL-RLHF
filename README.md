@@ -9,6 +9,8 @@
     <a href="CODE_OF_CONDUCT.md"><img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg"></a>
     <img alt="python version" src="https://img.shields.io/badge/python-%3E%3D3.10-orange">
     <img alt="Static Badge" src="https://img.shields.io/badge/pytorch-%3E%3D2.0-orange">
+    <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/TideDra/VL-RLHF">
+    <img alt="GitHub License" src="https://img.shields.io/github/license/TideDra/VL-RLHF">
     <br>
 </p>
 
