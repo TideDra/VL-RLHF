@@ -15,7 +15,7 @@
 </p>
 
 ## 🎉 News
-- 🔥2024.5.24: We release the code!
+- 🔥2024.5.30: We release the code!
 ## 📝 Introduction
 
 Research and development on preference learning of Vision-Language Models (VLM, LVLM or MLLM) is difficult because there is currently no unified model architecture in the VLM community. The implementations of the state-of-the-art VLMs like LLaVA, Qwen-VL and internlm-xcomposer, are also in different styles, leading it hard to include them in a single training framework. VL-RLHF provides a perfect solution to abstract VLMs in a framework, and its features includes
