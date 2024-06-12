@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Optional, Union, Tuple, Literal
 import torch
 import torch.nn as nn
-from torch.nn.modules import Module
 from PIL import Image
 from ...base.collator import (
     VLDPODataCollatorWithPadding,
@@ -472,55 +471,7 @@ class LlavaPPODataCollator(VLPPODataCollator):
         return batch
 
 
-class LlavaDPOTrainer(VLDPOTrainer):
-    def concatenated_forward(
-        self, model: Module, batch: Dict[str, Union[List, torch.LongTensor]]
-    ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
-        """Run the given model on the given batch of inputs, concatenating the chosen and rejected inputs together.
-
-        We do this to avoid doing two forward passes, because it's faster for FSDP.
-        """
-        concatenated_batch = self.concatenated_inputs(
-            batch,
-            is_encoder_decoder=self.is_encoder_decoder,
-            label_pad_token_id=self.label_pad_token_id,
-            padding_value=self.padding_value,
-            device=self.accelerator.device,
-        )
-        len_chosen = batch["chosen_labels"].shape[0]
-
-        model_kwargs = (
-            {
-                "labels": concatenated_batch["concatenated_labels"],
-                "decoder_input_ids": concatenated_batch.pop("concatenated_decoder_input_ids", None),
-            }
-            if self.is_encoder_decoder
-            else {}
-        )
-        output = model(
-            input_ids=concatenated_batch["concatenated_input_ids"],
-            pixel_values=concatenated_batch["pixel_values"],
-            attention_mask=concatenated_batch["concatenated_attention_mask"],
-            labels=concatenated_batch["concatenated_labels"],
-            **model_kwargs,
-        )
-        all_logits = output.logits
-        concatenated_labels_after_merging = output.labels
-        all_logps = self.get_batch_logps(
-            all_logits,
-            concatenated_labels_after_merging,
-            average_log_prob=False,
-            is_encoder_decoder=self.is_encoder_decoder,
-            label_pad_token_id=self.label_pad_token_id,
-        )
-
-        chosen_logps = all_logps[:len_chosen]
-        rejected_logps = all_logps[len_chosen:]
-
-        chosen_logits = all_logits[:len_chosen]
-        rejected_logits = all_logits[len_chosen:]
-
-        return (chosen_logps, rejected_logps, chosen_logits, rejected_logits)
+class LlavaDPOTrainer(VLDPOTrainer): ...
 
 
 class LlavaPPOTrainer(VLPPOTrainer): ...
