@@ -14,6 +14,9 @@
     <br>
 </p>
 
+> [!NOTE]
+> Due to personal reason, this repo is no longer maintained. I recommmend [ms-swift](https://github.com/modelscope/ms-swift) for furthur VL-RLHF research, which supports more VLMs and RLHF methods, and is actively maintained by the ModelScope team.
+
 ## 🎉 News
 - 🔥2024.5.30: We release the code!
 ## 📝 Introduction
